@@ -38,12 +38,9 @@ class Position(object):
         # heading: nan
         return Position(p1.x - p2.x, p1.y - p2.y, np.nan)
 
-    def __len__(p: Position):
-        # euclidian distance of p
-        return math.hypot(p.x, p.y)
-
-    def angle(self: Position):
-        return math.atan2(self.y, self.x)/pi*180
+    def to_polar(p: Position):
+        # Convert point (x, y) to polar coordinates (r, theta).
+        return math.hypot(p.x, p.y), math.atan2(self.y, self.x)/pi*180
 
     def __hash__(self: Position):
         return (int(self.x * (10 ** HASH_ACCURACY_DECIMAL)), 

@@ -91,23 +91,34 @@ class PositionManager(object):
         self.scenario = scenario
         self.vehicles = scenario.vehicles
         self.traci = scenario.traci
+        self.config = scenario.config['position_manager']
+        self.range_limit = self.config['range_limit']
 
         # TODO: naive implementation here.
-        self._position = {}
+        # TODO: thread safety.
+        self._position: Dict[Vehicle, Position] = {}
 
     def get_vehicles_in_range(self, position: Position) -> List[Vehicle]:
-        raise NotImplementedError
+        # TODO: O(N) implementation.
+        ret = []
+
+        for v, pos in self._position.items():
+            if (pos - position).to_polar[0] < self.range_limit
+                ret.append(v)
+
+        return ret
 
     def get_vehicle_position(self, vehicle: Vehicle) -> Position:
         return self._position[vehicle.numberplate]
 
     def update_all_position(self, tick: float):
         # Set vehicles' positions to the data at the given tick.
+        self._position = {}
 
-        for vid in self.vehicles.keys():
-            x, y = self.traci.vehicle.getPosition(vid)
-            yaw  = self.traci.vehicle.getAngle(vid)
-            self._position[vid] = Position(x, y, yaw)
+        for v in self.vehicles.keys():
+            x, y = self.traci.vehicle.getPosition(v.numberplate)
+            yaw  = self.traci.vehicle.getAngle(v.numberplate)
+            self._position[v] = Position(x, y, yaw)
 
 
 class NetworkSimulator(object):
@@ -123,19 +134,23 @@ class NetworkSimulator(object):
         self.position_manager = scenario.position_manager
 
         # Assign a receive buffer for each vehicle
-        self.receive_buffers = dict((i, []) for i in self.vehicles)
+        self.receive_buffers = {}
 
     def broadcast(self, sender: Vehicle, message: object) -> int:
-
+        # Broadcast a message to vehicles in range and return number of receipents.
         receivers = position_manager.get_vehicles_in_range(sender.position)
-        for i in receivers:
+        for v in receivers:
+            if v not in self.receive_buffers:
+                self.receive_buffers[v] = []
+
             if self.random.random() < self.pdr:
-                self.receive_buffers[i].append(message)
+                self.receive_buffers[v].append(message)
 
         return len(receivers)
 
     def receive(self, receiver: Vehicle) -> list:
-        ret = self.receive_buffers[receiver]
+        # Pop a vehicle's receive buffer.
+        ret = self.receive_buffers.get(receiver, [])
         self.receive_buffers[receiver] = []
 
         return ret
@@ -148,11 +163,16 @@ class PerceptionSimulator(object):
 
         self.position_manager = scenario.position_manager
 
-        raise NotImplementedError
-
 
     def perceive(self, vehicle: Vehicle) -> List[Vehicle]:
         # Return all perceived vehicles of the given vehicle.
-        raise NotImplementedError
+        candidates = position_manager.get_vehicles_in_range(self.position)
 
+        ret = []
 
+        for v in candidates:
+            delta = v.position - self.position
+            if 60 < delta.polar()[1] < 60:
+                ret.append(v)
+
+        return v
