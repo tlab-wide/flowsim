@@ -132,7 +132,7 @@ class MaliciousVehicle(Vehicle):
     _is_malicious = True
 
 @dataclasses.dataclass
-class SpamVehicle(MaliciousVehicle):
+class SpamAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [CPSSender, Planner]),
         (CPSSender, []),
@@ -142,7 +142,7 @@ class SpamVehicle(MaliciousVehicle):
     ]
 
 @dataclasses.dataclass
-class ReplayVehicle(MaliciousVehicle):
+class ReplayAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [CPSSender, CPSReplayer, Planner]),
         (CPSSender, []),
@@ -152,7 +152,7 @@ class ReplayVehicle(MaliciousVehicle):
     ]
 
 @dataclasses.dataclass
-class SilenceVehicle(MaliciousVehicle):
+class SilenceAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [Planner]),
         (CPSReceiver, [PoTVerifier]),

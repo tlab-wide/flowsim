@@ -1,17 +1,20 @@
 
 
-total_ticks: 86400
+--- 
+
+sumo_config_path: "../manhattan/data/manhattan.sumocfg"
 
 seed: 42
 
+use_gui: false
 
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
   ConnectedVehicle: 0.
   PoTVehicle: 1.
   SilenceAttacker: 0.
-  SpamAttacker: 0.1
-  RandomReplayAttacker: 0.
+  SpamAttacker: 0.
+  ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.
 

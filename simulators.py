@@ -30,38 +30,51 @@ class Scenario(object):
         self.perception = PerceptionSimulator(self)
 
         # Initialize vehicle type probability from config file.
-        possible_vehicle_types = [(i.__name__, i) for i in [
+        possible_vehicle_types = dict([(i.__name__, i) for i in [
             UnconnectedVehicle,
             ConnectedVehicle,
             PoTVehicle,
             SilenceAttacker,
             SpamAttacker,
-            RandomReplayAttacker,
+            ReplayAttacker,
             #SignalJammingAttacker,
             SybilAttacker,
-        ]]
+        ]])
 
-        self.vtp = self.config['vehicle_type_probabilities']
-        self.vtp = dict((possible_vehicle_types[k], v) for k, v in self.vtp.items())
+        vtp = self.config['vehicle_type_probabilities']
+        self.vtp = dict((possible_vehicle_types[k], v) for k, v in vtp.items())
         assert sum(self.vtp.values()) == 1
+
+        self.init_sumo()
+
+    def init_sumo(self):
+        if self.config['use_gui'] == 'True':
+            sumo_bin = 'sumo-gui'
+        else:
+            sumo_bin = 'sumo'
+
+        self.traci.start([sumo_bin, "-c", self.config['sumo_config_path']])
+
+        self.end_time = self.traci.simulation.getEndTime()
 
     def generate_vehicle(self, vid: str):
         # Generate one vehicle with specified id.
-        vehicle_class = self.vehicle_random.choices(self.vtp.keys(), self.vtp.values())[0]
+        vehicle_class = self.vehicle_random.choices(list(self.vtp.keys()), list(self.vtp.values()))[0]
 
         ret = vehicle_class(
             scenario = self,
             numberplate = vid,
-            config = config['vehicle'],
-            trace = self.sumo.vehicle_traces[vid],
+            config = self.config['vehicle'],
             random = random_from(self.vehicle_random),
         )
 
         return ret
 
-    def tick(self, tick):
+    def tick(self):
         # Run one traci step first.
         traci.simulationStep()
+        if traci.simulation.getTime() >= self.end_time:
+            raise StopIteration
 
         # Update vehicle list from traci.
         for vid in self.traci.simulation.getDepartedIDList():
@@ -73,17 +86,14 @@ class Scenario(object):
             del self.vehicles[vid]
 
         # Let position manager to update vehicles' position.
-        self.position_manager.update_all_position(tick)
+        self.position_manager.update_all_position()
 
         # Do a tick for every running vehicles.
         for v in self.vehicles:
             v.tick()
 
-
     def collect_metrics(self):
         raise NotImplementedError
-
-
 
 class PositionManager(object):
     def __init__(self, scenario: Scenario):
@@ -110,7 +120,7 @@ class PositionManager(object):
     def get_vehicle_position(self, vehicle: Vehicle) -> Position:
         return self._position[vehicle.numberplate]
 
-    def update_all_position(self, tick: float):
+    def update_all_position(self):
         # Set vehicles' positions to the data at the given tick.
         self._position = {}
 

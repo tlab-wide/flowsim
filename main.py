@@ -9,14 +9,16 @@ from simulators import *
 from modules import *
 from utils import *
 
-
 def main():
     config = yaml.safe_load(open(sys.argv[1], 'rb'))
     scenario = Scenario(config)
 
-    for tick in range(scenario.config['total_ticks']):
-        scenario.tick()
-        scenario.collect_metrics()
+    while True:
+        try:
+            scenario.tick()
+            scenario.collect_metrics()
+        except StopIteration:
+            break
 
 
 if __name__ == "__main__":
