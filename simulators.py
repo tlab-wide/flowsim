@@ -89,7 +89,7 @@ class Scenario(object):
         self.position_manager.update_all_position()
 
         # Do a tick for every running vehicles.
-        for v in self.vehicles:
+        for v in self.vehicles.values():
             v.tick()
 
     def collect_metrics(self):
@@ -118,15 +118,15 @@ class PositionManager(object):
         return ret
 
     def get_vehicle_position(self, vehicle: Vehicle) -> Position:
-        return self._position[vehicle.numberplate]
+        return self._position[vehicle]
 
     def update_all_position(self):
         # Set vehicles' positions to the data at the given tick.
         self._position = {}
 
-        for v in self.vehicles.keys():
-            x, y = self.traci.vehicle.getPosition(v.numberplate)
-            yaw  = self.traci.vehicle.getAngle(v.numberplate)
+        for numberplate, v in self.vehicles.items():
+            x, y = self.traci.vehicle.getPosition(numberplate)
+            yaw  = self.traci.vehicle.getAngle(numberplate)
             self._position[v] = Position(x, y, yaw)
 
 
@@ -148,7 +148,7 @@ class NetworkSimulator(object):
 
     def broadcast(self, sender: Vehicle, message: object) -> int:
         # Broadcast a message to vehicles in range and return number of receipents.
-        receivers = position_manager.get_vehicles_in_range(sender.position)
+        receivers = self.position_manager.get_vehicles_in_range(sender.position)
         for v in receivers:
             if v not in self.receive_buffers:
                 self.receive_buffers[v] = []
@@ -179,14 +179,14 @@ class PerceptionSimulator(object):
 
     def perceive(self, vehicle: Vehicle) -> List[Vehicle]:
         # Return all perceived vehicles of the given vehicle.
-        candidates = position_manager.get_vehicles_in_range(self.position)
+        candidates = self.position_manager.get_vehicles_in_range(vehicle.position)
 
         ret = []
 
         for v in candidates:
-            delta = v.position - self.position
+            delta = v.position - vehicle.position
             distance, angle = delta.to_polar()
             if distance < self.vision_distance and abs(angle) < self.vision_angle:
                 ret.append(v)
 
-        return v
+        return ret

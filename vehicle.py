@@ -84,13 +84,14 @@ class Vehicle(object):
             self.change_eid()
 
     def update_position(self):
-        p = self.scenario.position_manager.get_vehicle_position(self)
+        self.position = self.scenario.position_manager.get_vehicle_position(self)
+        print(f'Vehicle {self.numberplate} is at {self.position}')
 
     def do_work(self):
-        def _dfs(self, module_class, input):
-            module = self._module_instance_map(module_class)
-            result = module.do_work()
-            for i in self._data_flow_map[module]:
+        def _dfs(module_class, input):
+            module = self._module_instance_map[module_class]
+            result = module.do_work(input)
+            for i in self._data_flow_map[module_class]:
                 _dfs(i, result)
 
         for i in self._source_modules:

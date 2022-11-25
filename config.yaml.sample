@@ -30,4 +30,4 @@ perception_simulator:
   vision_angle: 60 # degrees (of one side)
 
 vehicle:
-  dummy: 0
+  eid_changing_possibility: 0.0001

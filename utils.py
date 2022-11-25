@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import math
 import random
 
 if 'SUMO_HOME' in os.environ:
@@ -40,9 +41,9 @@ class Position(object):
         # heading: nan
         return Position(p1.x - p2.x, p1.y - p2.y, np.nan)
 
-    def to_polar(p: Position):
+    def to_polar(self):
         # Convert point (x, y) to polar coordinates (r, theta).
-        return math.hypot(p.x, p.y), math.atan2(self.y, self.x)/pi*180
+        return math.hypot(self.x, self.y), math.atan2(self.y, self.x)/math.pi * 180
 
     def __hash__(self: Position):
         return (int(self.x * (10 ** HASH_ACCURACY_DECIMAL)), 

@@ -21,29 +21,35 @@ class LocalPerception(VehicleModule):
     # Local perception module
 
     def do_work(self, input: CPM) -> CPM:
+        assert input == None, f"Module {self.__class__.__name__} requires no input."
 
-        new_objects = self.vehicle.scenario.perception.perceive(self)
+        new_objects = self.vehicle.scenario.perception.perceive(self.vehicle)
 
         if len(new_objects) > 128:
             # TODO: we need a queue.
             raise NotImplementedError
 
-        ret = CPM(perceived_objects = [
-            (None, v, v.position) for v in new_objects
-        ])
+        ret = CPM(
+            sender=self.vehicle.eid,
+            perceived_objects = [(None, v, v.position) for v in new_objects],
+        )
 
 class Planner(VehicleModule):
     # Planning module
     def do_work(self, input: CPM) -> CPM:
+        assert input != None, f"Module {self.__class__.__name__} requires input."
         return None
 
 class CPSReceiver(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
+        assert input == None, f"Module {self.__class__.__name__} requires no input."
+
         return self.vehicle.scenario.network.receive(self.vehicle)
         
 
 class CPSSender(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
+        assert input != None, f"Module {self.__class__.__name__} requires input."
 
         cpm.verify()
         self.vehicle.scenario.network.broadcast(self.vehicle, CPM)
@@ -51,21 +57,27 @@ class CPSSender(VehicleModule):
 
 class CPSSpammer(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
+        assert input == None, f"Module {self.__class__.__name__} requires no input."
+
         raise NotImplementedError
 
 class CPSReplayer(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
+        assert input == None, f"Module {self.__class__.__name__} requires no input."
+
         raise NotImplementedError
 
 class PoTProver(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
+        assert input != None, f"Module {self.__class__.__name__} requires input."
+
         # TODO: queue excessive proofs.
         assert input.proofs == []
 
         self_id = self.vehicle.eid
 
         proofs = [
-            (objid, pot_proof(v.eid, v.numberplate, self.id))
+            (objid, pot_proof(v.eid, v.numberplate, self_id))
             for objid, v, _ in input.perceived_objects
         ]
 
@@ -73,6 +85,7 @@ class PoTProver(VehicleModule):
 
 class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
+
         super().__init__(vehicle)
 
         self.confirmed_eids = set()
@@ -83,6 +96,8 @@ class PoTVerifier(VehicleModule):
         self._unconfirmed_objects: List[Tuple['Vehicle', Position]] = []
 
     def do_work(self, input: CPM) -> CPM:
+        assert input != None, f"Module {self.__class__.__name__} requires input."
+
         self.update_proof_db(input)
 
         self.stage_objects(input)
