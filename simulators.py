@@ -57,6 +57,9 @@ class Scenario(object):
 
         self.end_time = self.traci.simulation.getEndTime()
 
+    def cleanup(self):
+        self.traci.close()
+
     def generate_vehicle(self, vid: str):
         # Generate one vehicle with specified id.
         vehicle_class = self.vehicle_random.choices(list(self.vtp.keys()), list(self.vtp.values()))[0]
@@ -73,8 +76,11 @@ class Scenario(object):
     def tick(self):
         # Run one traci step first.
         traci.simulationStep()
-        if traci.simulation.getTime() >= self.end_time:
+
+        now = traci.simulation.getTime()
+        if now >= self.end_time:
             raise StopIteration
+        print("Simulation time: %.2f" % now)
 
         # Update vehicle list from traci.
         for vid in self.traci.simulation.getDepartedIDList():

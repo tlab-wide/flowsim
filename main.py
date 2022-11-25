@@ -16,9 +16,11 @@ def main():
     while True:
         try:
             scenario.tick()
-            scenario.collect_metrics()
+            #scenario.collect_metrics()
         except StopIteration:
             break
+
+    scenario.cleanup()
 
 
 if __name__ == "__main__":

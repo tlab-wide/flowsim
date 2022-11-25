@@ -29,7 +29,7 @@ class LocalPerception(VehicleModule):
             # TODO: we need a queue.
             raise NotImplementedError
 
-        ret = CPM(
+        return CPM(
             sender=self.vehicle.eid,
             perceived_objects = [(None, v, v.position) for v in new_objects],
         )
@@ -51,7 +51,8 @@ class CPSSender(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
         assert input != None, f"Module {self.__class__.__name__} requires input."
 
-        cpm.verify()
+        input.verify()
+
         self.vehicle.scenario.network.broadcast(self.vehicle, CPM)
         return None
 

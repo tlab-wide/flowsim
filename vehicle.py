@@ -77,7 +77,7 @@ class Vehicle(object):
         self.do_work()
 
     def change_eid(self):
-        self._eid = '%064x' % (self.random.randint(0, 2**256 - 1))
+        self.eid = '%064x' % (self.random.randint(0, 2**256 - 1))
 
     def possibly_change_eid(self):
         if self.random.random() < self.config['eid_changing_possibility']:
@@ -85,7 +85,6 @@ class Vehicle(object):
 
     def update_position(self):
         self.position = self.scenario.position_manager.get_vehicle_position(self)
-        print(f'Vehicle {self.numberplate} is at {self.position}')
 
     def do_work(self):
         def _dfs(module_class, input):

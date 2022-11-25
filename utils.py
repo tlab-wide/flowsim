@@ -58,9 +58,10 @@ class CPM(object):
 
     def verify(self):
         # Sanity checks to determine whether it is elligible to send on wire.
-        assert isinstance(sender, EID) and sender != ""
-        assert len(perceived_objects) <= 128
-        assert len(proofs) <= 8
+        assert isinstance(self.sender, EID)
+        assert self.sender != ""
+        assert len(self.perceived_objects) <= 128
+        assert len(self.proofs) <= 8
 
     def __len__(self):
         # Calculate the total length of the actual CPM packet.
