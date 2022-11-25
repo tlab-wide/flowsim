@@ -40,6 +40,8 @@
         <duration-log.statistics value="true"/>
     </report>
 
+    <gui-settings-file value="viewsettings.xml"/>
+
     <random_number>
         <seed value="42"/>
     </random_number>
