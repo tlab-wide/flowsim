@@ -6,7 +6,8 @@ import abc
 import traci
 import traci.constants
 
-from .utils import *
+from vehicle import *
+from utils import *
 
 class Scenario(object):
     # The top-level simulation scenario.
@@ -69,7 +70,7 @@ class Scenario(object):
             if vid not in self.vehicles:
                 self.vehicles[vid] = self.generate_vehicle(vid)
 
-        from vid in self.traci.simulation.getArrivedIDList():
+        for vid in self.traci.simulation.getArrivedIDList():
             self.vehicles[vid].stop()
             del self.vehicles[vid]
 
@@ -103,7 +104,7 @@ class PositionManager(object):
         ret = []
 
         for v, pos in self._position.items():
-            if (pos - position).to_polar[0] < self.range_limit
+            if (pos - position).to_polar[0] < self.range_limit:
                 ret.append(v)
 
         return ret

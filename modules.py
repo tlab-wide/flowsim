@@ -49,6 +49,14 @@ class CPSSender(VehicleModule):
         self.vehicle.scenario.network.broadcast(self.vehicle, CPM)
         return None
 
+class CPSSpammer(VehicleModule):
+    def do_work(self, input: CPM) -> CPM:
+        raise NotImplementedError
+
+class CPSReplayer(VehicleModule):
+    def do_work(self, input: CPM) -> CPM:
+        raise NotImplementedError
+
 class PoTProver(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
         # TODO: queue excessive proofs.
@@ -70,7 +78,7 @@ class PoTVerifier(VehicleModule):
         self.confirmed_proofs: Dict[Pubkey, EID] = {}   # value: Target EID
         self.unconfirmed_proofs: Dict[Pubkey, EID] = {} # value: Sender EID
 
-        self._unconfirmed_objects: List[Tuple[Vehicle, Position]] = []
+        self._unconfirmed_objects: List[Tuple['Vehicle', Position]] = []
 
     def do_work(self, input: CPM) -> CPM:
         self.update_proof_db(input)
@@ -79,7 +87,7 @@ class PoTVerifier(VehicleModule):
 
         return self.flush_objects(input)
 
-    def _get_obj_by_objid(input: CPM, objid: int) -> Vehicle:
+    def _get_obj_by_objid(input: CPM, objid: int) -> 'Vehicle':
         for o, v, _ in input.perceived_objects:
             if o == objid:
                 return v

@@ -8,10 +8,10 @@ import numpy as np
 import pandas
 from typing import *
 
-from .vehicle import *
-from .simulators import *
-from .modules import *
-from .utils import *
+from vehicle import *
+from simulators import *
+from modules import *
+from utils import *
 
 
 def main():
@@ -19,6 +19,6 @@ def main():
     scenario = Scenario(config)
 
     for tick in range(scenario.config['total_ticks']):
-        scenario.do_one_tick()
+        scenario.tick()
         scenario.collect_metrics()
 

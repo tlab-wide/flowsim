@@ -1,16 +1,18 @@
 
+from typing import *
 import dataclasses
+import random
 import abc
 
-from .utils import *
-from .modules import *
+from utils import *
+from modules import *
 
 @dataclasses.dataclass
 class Vehicle(object):
-    scenario: Scenario
+    scenario: 'Scenario'
     numberplate: str
     config: object
-    random: Random = random
+    random: random.Random = random
     _is_malicious: bool = False
 
     position: Position = Position(np.nan, np.nan, np.nan)
@@ -33,7 +35,7 @@ class Vehicle(object):
     #     (PoTVerifier, [Planner]),
     #     (Planner, []),
     # ]
-    data_flow: List[Tuple[VehicleModule, List[VehicleModule]]]
+    data_flow: List[Tuple[VehicleModule, List[VehicleModule]]] = None
 
     def __post_init__(self):
         # dataclass exposes this method which meant to be run after __init__.
