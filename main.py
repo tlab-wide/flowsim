@@ -1,11 +1,7 @@
 #!/usr/bin/python3
 
-import dataclasses
-import random
+import sys
 import yaml
-import math
-import numpy as np
-import pandas
 from typing import *
 
 from vehicle import *
@@ -22,3 +18,9 @@ def main():
         scenario.tick()
         scenario.collect_metrics()
 
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: %s config.yaml" % sys.argv[0])
+        exit(1)
+    main()
