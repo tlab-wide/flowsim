@@ -21,22 +21,18 @@ class Scenario(object):
         # Vehicle random, used to select vehicle type, and derive randoms for vehicle instances.
         self.vehicle_random = random_from(self.random)
 
-        # Vehicle repository
+        # Vehicle repository.
         self.vehicles: Dict[str, Vehicle] = {}
 
-        # Simulator modules
+        # Simulator modules.
         self.position_manager = PositionManager(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
 
-
-    def generate_vehicle(self, vid: str):
-        # Generate one vehicle with specified id.
-
-        # TODO: move this to init.
+        # Initialize vehicle type probability from config file.
         possible_vehicle_types = [(i.__name__, i) for i in [
             UnconnectedVehicle,
-            NormalVehicle,
+            ConnectedVehicle,
             PoTVehicle,
             SilenceAttacker,
             SpamAttacker,
@@ -45,11 +41,13 @@ class Scenario(object):
             SybilAttacker,
         ]]
 
-        vtp = self.config['vehicle_type_probabilities']
-        vtp = dict((possible_vehicle_types[k], v) for k, v in vtp.items())
-        assert sum(vtp.values()) == 1
+        self.vtp = self.config['vehicle_type_probabilities']
+        self.vtp = dict((possible_vehicle_types[k], v) for k, v in self.vtp.items())
+        assert sum(self.vtp.values()) == 1
 
-        vehicle_class = self.vehicle_random.choices(vtp.keys(), vtp.values())[0]
+    def generate_vehicle(self, vid: str):
+        # Generate one vehicle with specified id.
+        vehicle_class = self.vehicle_random.choices(self.vtp.keys(), self.vtp.values())[0]
 
         ret = vehicle_class(
             scenario = self,
@@ -104,7 +102,7 @@ class PositionManager(object):
         ret = []
 
         for v, pos in self._position.items():
-            if (pos - position).to_polar[0] < self.range_limit:
+            if (pos - position).to_polar()[0] < self.range_limit:
                 ret.append(v)
 
         return ret
@@ -126,11 +124,12 @@ class NetworkSimulator(object):
     # Network simulator.
     # Currently a hand-crafted (dummy) implementation is used.
 
-    def __init__(self, secenario: Scenario):
-        self.secenario = scenario
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
         self.vehicles = scenario.vehicles
         self.random = random_from(scenario.random)
-        self.pdr = scenario.config['v2v_pdr']
+        self.config = scenario.config['network_simulator']
+        self.pdr = self.config['v2v_pdr']
 
         self.position_manager = scenario.position_manager
 
@@ -157,10 +156,13 @@ class NetworkSimulator(object):
         return ret
 
 class PerceptionSimulator(object):
-    def __init__(self, secenario: Scenario):
-        self.secenario = scenario
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
         self.vehicles = scenario.vehicles
         self.random = random_from(scenario.random)
+        self.config = scenario.config['perception_simulator']
+        self.vision_distance = self.config['vision_distance']
+        self.vision_angle = abs(self.config['vision_angle'])
 
         self.position_manager = scenario.position_manager
 
@@ -173,7 +175,8 @@ class PerceptionSimulator(object):
 
         for v in candidates:
             delta = v.position - self.position
-            if 60 < delta.polar()[1] < 60:
+            distance, angle = delta.to_polar()
+            if distance < self.vision_distance and abs(angle) < self.vision_angle:
                 ret.append(v)
 
         return v
