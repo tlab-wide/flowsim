@@ -9,7 +9,7 @@ import utils
 class VehicleModule(metaclass=abc.ABCMeta):
     # A module in a Vehicle 
 
-    def __init__(self, vehicle):
+    def __init__(self, vehicle: 'Vehicle'):
         self.vehicle = vehicle
 
     @abc.abstractmethod
@@ -72,7 +72,9 @@ class PoTProver(VehicleModule):
         return CPM(self_id, input.perceived_objects, proofs)
 
 class PoTVerifier(VehicleModule):
-    def __init__(self):
+    def __init__(self, vehicle: 'Vehicle'):
+        super().__init__(vehicle)
+
         self.confirmed_eids = set()
 
         self.confirmed_proofs: Dict[Pubkey, EID] = {}   # value: Target EID

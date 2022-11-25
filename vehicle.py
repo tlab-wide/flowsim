@@ -11,9 +11,8 @@ from modules import *
 class Vehicle(object):
     scenario: 'Scenario'
     numberplate: str
-    config: object
+    config: dict
     random: random.Random = random
-    _is_malicious: bool = False
 
     position: Position = Position(np.nan, np.nan, np.nan)
     eid: EID = None
@@ -35,7 +34,10 @@ class Vehicle(object):
     #     (PoTVerifier, [Planner]),
     #     (Planner, []),
     # ]
-    data_flow: List[Tuple[VehicleModule, List[VehicleModule]]] = None
+    data_flow = None
+
+    # A flag to (internally) indicate whether the vehicle is a malicious one.
+    _is_malicious = False
 
     def __post_init__(self):
         # dataclass exposes this method which meant to be run after __init__.
@@ -44,17 +46,19 @@ class Vehicle(object):
         self.change_eid()
 
         # Init modules.
-        modules = list(i[0] for i in self.data_flow)
+        data_flow = self.__class__.data_flow
+
+        modules = list(i[0] for i in data_flow)
         assert len(modules) == len(set(modules)), "A module should appear only once from the left."
 
         self._module_instance_map = dict((i, i(self)) for i in modules)
-        self._data_flow_map = dict(self.data_flow)
+        self._data_flow_map = dict(data_flow)
 
         # Find the source modules (which runs by itself with no input).
         # A source module is the one which never appears as the target of a flow.
         # Operates in the original list to maintain the right order of source modules.
         flow_targets = set(sum(self._data_flow_map.values(), []))
-        self._source_modules = [i[0] for i in self.data_flow if i[0] not in flow_targets]
+        self._source_modules = [i[0] for i in data_flow if i[0] not in flow_targets]
 
     def __eq__(lhs, rhs):
         return (
@@ -100,14 +104,12 @@ class Vehicle(object):
 #   Definition of different vehicle types
 # =========================================
 
-@dataclasses.dataclass
 class UnconnectedVehicle(Vehicle):
     data_flow = [
         (LocalPerception, [Planner]),
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class ConnectedVehicle(Vehicle):
     data_flow = [
         (LocalPerception, [CPSSender, Planner]),
@@ -116,7 +118,6 @@ class ConnectedVehicle(Vehicle):
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class PoTVehicle(Vehicle):
     data_flow = [
         (LocalPerception, [PoTProver, Planner]),
@@ -127,11 +128,9 @@ class PoTVehicle(Vehicle):
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class MaliciousVehicle(Vehicle):
     _is_malicious = True
 
-@dataclasses.dataclass
 class SpamAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [CPSSender, Planner]),
@@ -141,7 +140,6 @@ class SpamAttacker(MaliciousVehicle):
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class ReplayAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [CPSSender, CPSReplayer, Planner]),
@@ -151,7 +149,6 @@ class ReplayAttacker(MaliciousVehicle):
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class SilenceAttacker(MaliciousVehicle):
     data_flow = [
         (LocalPerception, [Planner]),
@@ -160,7 +157,6 @@ class SilenceAttacker(MaliciousVehicle):
         (Planner, []),
     ]
 
-@dataclasses.dataclass
 class SybilAttacker(MaliciousVehicle):
     pass
 
