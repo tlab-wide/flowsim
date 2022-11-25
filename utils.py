@@ -6,6 +6,7 @@ import os
 import sys
 import math
 import random
+from typing import *
 
 if 'SUMO_HOME' in os.environ:
  tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -18,10 +19,15 @@ import dataclasses
 import numpy as np
 
 
-# Define type of a vehicle's EID
+# Define types.
+NumberPlate = str
 EID = str
 Proof = bytes
 Pubkey = bytes
+
+# Define metric types.
+VehicleMetric = Dict[NumberPlate, int]
+GlobalMetric = int
 
 def random_from(parent: Union[random.Random, int]) -> random.Random:
     # Derive a new Random instance from an existing Random or an integer seed.

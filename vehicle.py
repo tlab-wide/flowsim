@@ -86,12 +86,30 @@ class Vehicle(object):
     def update_position(self):
         self.position = self.scenario.position_manager.get_vehicle_position(self)
 
+    def get_module(self, module_class: Type['Module']) -> 'Module':
+        return self._module_instance_map[module_class]
+
     def do_work(self):
         def _dfs(module_class, input):
-            module = self._module_instance_map[module_class]
-            result = module.do_work(input)
-            for i in self._data_flow_map[module_class]:
-                _dfs(i, result)
+            module = self.get_module(module_class)
+            output = module.do_work(input)
+
+            if output == None:
+                assert not self._data_flow_map[module_class], \
+                    f"Module {module_class.__name__} should produce CPM if it is not the sink."
+                return
+
+            # Handle list of output as well.
+            if type(output) != list:
+                output = [output]
+
+            for o in output:
+                assert isinstance(o, CPM), \
+                    f"Module {module_class.__name__} should return a CPM instead of {type(result)}."
+
+                for target in self._data_flow_map[module_class]:
+                    _dfs(target, o)
+
 
         for i in self._source_modules:
             # DFS into the module flow tree.

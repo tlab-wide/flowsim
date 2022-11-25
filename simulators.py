@@ -7,6 +7,7 @@ import traci
 import traci.constants
 
 from vehicle import *
+from modules import *
 from utils import *
 
 class Scenario(object):
@@ -29,6 +30,8 @@ class Scenario(object):
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
 
+        self.now = 0.
+
         # Initialize vehicle type probability from config file.
         possible_vehicle_types = dict([(i.__name__, i) for i in [
             UnconnectedVehicle,
@@ -48,7 +51,7 @@ class Scenario(object):
         self.init_sumo()
 
     def init_sumo(self):
-        if self.config['use_gui'] == 'True':
+        if self.config['use_gui'] == True:
             sumo_bin = 'sumo-gui'
         else:
             sumo_bin = 'sumo'
@@ -87,6 +90,9 @@ class Scenario(object):
             if vid not in self.vehicles:
                 self.vehicles[vid] = self.generate_vehicle(vid)
 
+                # Set default color.
+                self.set_vehicle_color(vid, (128, 128, 128, 255))
+
         for vid in self.traci.simulation.getArrivedIDList():
             self.vehicles[vid].stop()
             del self.vehicles[vid]
@@ -99,7 +105,41 @@ class Scenario(object):
             v.tick()
 
     def collect_metrics(self):
-        raise NotImplementedError
+        # Collect metrics from all vehicles.
+
+        recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
+
+        #print(recent_saw_by)
+        def _normalize_color(n, max_ = 10, min_ = 0) -> int:
+            # Normalize and clip a number to 0-255.
+            ret = int(255. * (n - min_) / (max_ - min_))
+            return min(max(ret, 0), 255)
+
+        for vid in self.traci.simulation.getDepartedIDList():
+            # Set color according to metrics.
+
+            r = _normalize_color(recent_saw_by[vid], max_=100)
+            g = 0
+            b = 0
+
+            self.set_vehicle_color(vid, (r, g, b, 255))
+
+    def set_vehicle_color(self, vid: str, color: Tuple[int, int, int, int]):
+        # Set vehicle color if gui is enabled.
+        if self.config['use_gui'] == True:
+            self.traci.vehicle.setColor(vid, color)
+
+    def collect_recent_saw_by(self) -> VehicleMetric:
+        # Collect how many vehicles saw a given vehicle in the last 10 seconds.
+
+        ret = dict((id, 0) for id in self.vehicles.keys())
+
+        for v0 in self.vehicles.values():
+            for v1 in v0.get_module(Planner).recent_seen_vehicles():
+                ret[v1.numberplate] += 1
+
+        return ret
+
 
 class PositionManager(object):
     def __init__(self, scenario: Scenario):
