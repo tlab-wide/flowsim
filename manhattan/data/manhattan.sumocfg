@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on Mon Mar 25 08:16:37 2019 by Eclipse SUMO Version v1_0_1+0645-93703db
+-->
+
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="net.net.xml"/>
+        <route-files value="routes.xml"/>
+    </input>
+
+
+    <output>
+        <output-prefix value="out/most."/>
+        <summary-output value="summary.xml"/>
+        <tripinfo-output value="tripinfo.xml"/>
+        <!-- <tripinfo-output.write-unfinished value="true"/> -->
+        <!-- <vehroute-output value="vehroute.xml"/> -->
+        <!-- <vehroute-output.route-length value="true"/> -->
+        <!-- <vehroute-output.write-unfinished value="true"/> -->
+        <!-- <vehroute-output.skip-ptlines value="true"/> -->
+        <!-- <vehroute-output.exit-times value="true"/> -->
+        <!-- <stop-output value="stop.out.xml"/> -->
+        <!-- <lanechange-output value="lanechanges.out.xml"/> -->
+        <!-- <lanechange-output.started value="true"/> -->
+        <!-- <lanechange-output.ended value="true"/> -->
+        <!-- <fcd-output value="fcd.xml"/> -->
+    </output>
+
+    <time>
+        <begin value="0"/>
+        <step-length value="1"/>
+        <end value="100"/>
+    </time>
+
+    <report>
+        <verbose value="true" synonymes="v"/>
+        <log value="sim.log" synonymes="l log-file"/>
+        <duration-log.statistics value="true"/>
+    </report>
+
+    <random_number>
+        <seed value="42"/>
+    </random_number>
+
+</configuration>
