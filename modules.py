@@ -119,7 +119,7 @@ class PoTVerifier(VehicleModule):
         self.confirmed_proofs: Dict[Pubkey, EID] = {}   # value: Target EID
         self.unconfirmed_proofs: Dict[Pubkey, EID] = {} # value: Sender EID
 
-        self._unconfirmed_objects: List[Tuple['Vehicle', Position]] = []
+        self._unconfirmed_objects: Dict['Vehicle', Position] = {}
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
@@ -130,7 +130,7 @@ class PoTVerifier(VehicleModule):
 
         return self.flush_objects(input)
 
-    def _get_obj_by_objid(input: CPM, objid: int) -> 'Vehicle':
+    def _get_obj_by_objid(self, input: CPM, objid: int) -> 'Vehicle':
         for o, v, _ in input.perceived_objects:
             if o == objid:
                 return v
@@ -146,11 +146,11 @@ class PoTVerifier(VehicleModule):
 
             # If the pubkey is seen for the first time, add it to unconfirmed.
             if pubkey not in self.unconfirmed_proofs:
-                self._proof_db[pubkey] = input.sender
+                self.unconfirmed_proofs[pubkey] = input.sender
 
-            if input.sender != self._proof_db[pubkey]:
+            if input.sender != self.unconfirmed_proofs[pubkey]:
                 # We found a confirmed proof!
-                target_id = self._get_obj_by_objid(input).eid
+                target_id = self._get_obj_by_objid(input, objid).eid
 
                 self.confirmed_eids.add(target_id)
 
@@ -165,15 +165,15 @@ class PoTVerifier(VehicleModule):
 
     def flush_objects(self, input: CPM) -> CPM:
 
-        confirmed_objects = [
-            (None, v, pos) for v, pos in self._unconfirmed_objects if
+        confirmed_objects_list = [
+            (None, v, pos) for v, pos in self._unconfirmed_objects.items() if
             v.eid in self.confirmed_eids
         ]
 
         # Update still unconfirmed objects.
-        self._unconfirmed_objects = [
-            (v, pos) for v, pos in self._unconfirmed_objects if
+        self._unconfirmed_objects = dict(
+            (v, pos) for v, pos in self._unconfirmed_objects.items() if
             v.eid not in self.confirmed_eids
-        ]
+        )
 
-        return CPM(input.sender, confirmed_objects)
+        return CPM(input.sender, confirmed_objects_list)

@@ -9,18 +9,17 @@ seed: 42
 use_gui: true
 
 vehicle_type_probabilities:
-  UnconnectedVehicle: 0.
-  ConnectedVehicle: 1.
-  PoTVehicle: 0.
-  SilenceAttacker: 0.
+  UnconnectedVehicle: 0.33
+  ConnectedVehicle: 0.33
+  PoTVehicle: 0.33
+  SilenceAttacker: 0.01
   SpamAttacker: 0.
   ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.
 
-
 position_manager:
-  range_limit: 600 # meters
+  range_limit: 200 # meters
 
 network_simulator:
   v2v_pdr: 0.95

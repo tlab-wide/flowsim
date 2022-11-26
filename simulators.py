@@ -16,6 +16,8 @@ class Scenario(object):
         self.config = config
         self.traci = traci
 
+        self.use_gui = self.config['use_gui']
+        
         self.seed = self.config.get('seed', random.randint(0, 2 ** 32 - 1))
         # Master random, only used for deriving other randoms.
         self.random = random_from(self.seed)
@@ -109,7 +111,9 @@ class Scenario(object):
 
         recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
 
-        #print(recent_saw_by)
+        if not self.use_gui:
+            print(recent_saw_by)
+
         def _normalize_color(n, max_ = 10, min_ = 0) -> int:
             # Normalize and clip a number to 0-255.
             ret = int(255. * (n - min_) / (max_ - min_))
@@ -118,7 +122,7 @@ class Scenario(object):
         for vid in self.traci.simulation.getDepartedIDList():
             # Set color according to metrics.
 
-            r = _normalize_color(recent_saw_by[vid], max_=100)
+            r = _normalize_color(recent_saw_by[vid], max_=10)
             g = 0
             b = 0
 
@@ -126,7 +130,7 @@ class Scenario(object):
 
     def set_vehicle_color(self, vid: str, color: Tuple[int, int, int, int]):
         # Set vehicle color if gui is enabled.
-        if self.config['use_gui'] == True:
+        if self.use_gui:
             self.traci.vehicle.setColor(vid, color)
 
     def collect_recent_saw_by(self) -> VehicleMetric:
