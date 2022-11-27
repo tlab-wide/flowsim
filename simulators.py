@@ -3,8 +3,9 @@ from typing import *
 import dataclasses
 import abc
 
+import numba
 import traci
-import traci.constants
+import math
 
 from vehicle import *
 from modules import *
@@ -13,27 +14,24 @@ from utils import *
 class Scenario(object):
     # The top-level simulation scenario.
     def __init__(self, config):
-        self.config = config
         self.traci = traci
-
+        self.config = config
         self.use_gui = self.config['use_gui']
         
-        self.seed = self.config.get('seed', random.randint(0, 2 ** 32 - 1))
-        # Master random, only used for deriving other randoms.
-        self.random = random_from(self.seed)
-        # Vehicle random, used to select vehicle type, and derive randoms for vehicle instances.
-        self.vehicle_random = random_from(self.random)
+        self.init_sumo()
+        self.init_vtp()
+        self.init_rng()
 
-        # Vehicle repository.
+        # Create vehicle repository.
         self.vehicles: Dict[str, Vehicle] = {}
 
-        # Simulator modules.
+        # Create simulator modules.
         self.position_manager = PositionManager(self)
+        #self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
 
-        self.now = 0.
-
+    def init_vtp(self):
         # Initialize vehicle type probability from config file.
         possible_vehicle_types = dict([(i.__name__, i) for i in [
             UnconnectedVehicle,
@@ -50,16 +48,19 @@ class Scenario(object):
         self.vtp = dict((possible_vehicle_types[k], v) for k, v in vtp.items())
         assert sum(self.vtp.values()) == 1
 
-        self.init_sumo()
+    def init_rng(self):
+        self.seed = self.config.get('seed', random.randint(0, 2 ** 32 - 1))
+        # Master random, only used for deriving other randoms.
+        self.random = random_from(self.seed)
+        # Vehicle random, used to select vehicle type, and derive randoms for vehicle instances.
+        self.vehicle_random = random_from(self.random)
 
     def init_sumo(self):
-        if self.config['use_gui'] == True:
-            sumo_bin = 'sumo-gui'
-        else:
-            sumo_bin = 'sumo'
+        sumo_bin = 'sumo-gui' if self.use_gui else 'sumo'
 
         self.traci.start([sumo_bin, "-c", self.config['sumo_config_path']])
 
+        self.now = self.traci.simulation.getTime()
         self.end_time = self.traci.simulation.getEndTime()
 
     def cleanup(self):
@@ -112,7 +113,7 @@ class Scenario(object):
         recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
 
         if not self.use_gui:
-            print(recent_saw_by)
+            print('recent_saw_by = %s' % recent_saw_by)
 
         def _normalize_color(n, max_ = 10, min_ = 0) -> int:
             # Normalize and clip a number to 0-255.
@@ -157,7 +158,7 @@ class PositionManager(object):
         # TODO: thread safety.
         self._position: Dict[Vehicle, Position] = {}
 
-    def get_vehicles_in_range(self, position: Position) -> List[Vehicle]:
+    def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
         # TODO: O(N) implementation.
         ret = []
 
@@ -180,6 +181,62 @@ class PositionManager(object):
             self._position[v] = Position(x, y, yaw)
 
 
+class PositionManagerV2(object):
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
+        self.vehicles = scenario.vehicles
+        self.traci = scenario.traci
+        self.config = scenario.config['position_manager']
+        self.range_limit = self.config['range_limit']
+
+        grid_size = self.range_limit
+
+        self.boundary = self.traci.simulation.getNetBoundary()
+        assert self.boundary[0] == (0, 0)
+
+        # Create a grid of grid_x and grid_y with padding.
+        grid_x = math.ceil(self.boundary[1][0] / self.range_limit)
+        grid_y = math.ceil(self.boundary[1][1] / self.range_limit)
+
+        self._grid = [[set() for _ in range(grid_y + 2)] for _ in range(grid_x + 2)]
+
+    def get_vehicle_position(self, vehicle: Vehicle) -> Position:
+        return self._position[vehicle]
+
+    def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
+        # Get nearby vehicles from given position.
+
+        # Offset by one since the grid is padded.
+        grid_x = math.floor(position.x / self.range_limit) + 1
+        grid_y = math.floor(position.y / self.range_limit) + 1
+
+        # Get all vehicles in the 9 adjacent grids as candidates.
+        candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
+
+        # Filter out vehicles > range_limit away.
+        ret = [ v for v in candidates if (self._position[v] - position).to_polar()[0] < self.range_limit ]
+
+        return ret
+
+    def update_all_position(self):
+        # Set vehicles' positions to the data at the given tick.
+        self._position = {}
+
+        for numberplate, v in self.vehicles.items():
+            x, y = self.traci.vehicle.getPosition(numberplate)
+            yaw  = self.traci.vehicle.getAngle(numberplate)
+            self._position[v] = Position(x, y, yaw)
+
+        # Recreate grid.
+        self._grid = [[set() for _ in range(len(self._grid[0]))] for _ in range(len(self._grid))]
+
+        for v, pos in self._position.items():
+            # Offset by one since the grid is padded.
+            grid_x = math.floor(pos.x / self.range_limit) + 1
+            grid_y = math.floor(pos.y / self.range_limit) + 1
+
+            self._grid[grid_x][grid_y].add(v)
+
 class NetworkSimulator(object):
     # Network simulator.
     # Currently a hand-crafted (dummy) implementation is used.
@@ -198,7 +255,7 @@ class NetworkSimulator(object):
 
     def broadcast(self, sender: Vehicle, message: object) -> int:
         # Broadcast a message to vehicles in range and return number of receipents.
-        receivers = self.position_manager.get_vehicles_in_range(sender.position)
+        receivers = self.position_manager.get_nearby_vehicles(sender.position)
         for v in receivers:
             if v not in self.receive_buffers:
                 self.receive_buffers[v] = []
@@ -229,7 +286,7 @@ class PerceptionSimulator(object):
 
     def perceive(self, vehicle: Vehicle) -> List[Vehicle]:
         # Return all perceived vehicles of the given vehicle.
-        candidates = self.position_manager.get_vehicles_in_range(vehicle.position)
+        candidates = self.position_manager.get_nearby_vehicles(vehicle.position)
 
         ret = []
 
