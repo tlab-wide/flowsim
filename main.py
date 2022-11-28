@@ -2,6 +2,7 @@
 
 import sys
 import yaml
+import atexit
 from typing import *
 
 from vehicle import *
@@ -20,8 +21,10 @@ def main():
         except StopIteration:
             break
 
-    scenario.cleanup()
+    atexit.register(lambda: scenario.cleanup())
 
+    scenario.cleanup()
+    
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
