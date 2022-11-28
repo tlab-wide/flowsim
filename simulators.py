@@ -83,10 +83,10 @@ class Scenario(object):
         # Run one traci step first.
         traci.simulationStep()
 
-        now = traci.simulation.getTime()
-        if now >= self.end_time:
+        self.now = traci.simulation.getTime()
+        if self.now >= self.end_time:
             raise StopIteration
-        print("Simulation time: %.2f" % now)
+        print("Simulation time: %.2f" % self.now)
 
         # Update vehicle list from traci.
         for vid in self.traci.simulation.getDepartedIDList():
@@ -120,7 +120,7 @@ class Scenario(object):
             ret = int(255. * (n - min_) / (max_ - min_))
             return min(max(ret, 0), 255)
 
-        for vid in self.traci.simulation.getDepartedIDList():
+        for vid in self.vehicles.keys():
             # Set color according to metrics.
 
             r = _normalize_color(recent_saw_by[vid], max_=10)
@@ -257,6 +257,8 @@ class NetworkSimulator(object):
         # Broadcast a message to vehicles in range and return number of receipents.
         receivers = self.position_manager.get_nearby_vehicles(sender.position)
         for v in receivers:
+            if v == sender: continue # Don't send to self.
+
             if v not in self.receive_buffers:
                 self.receive_buffers[v] = []
 
@@ -291,6 +293,7 @@ class PerceptionSimulator(object):
         ret = []
 
         for v in candidates:
+            if v == ego: continue # Don't count self.
             delta = v.position - vehicle.position
             distance, angle = delta.to_polar()
             if distance < self.vision_distance and abs(angle) < self.vision_angle:
