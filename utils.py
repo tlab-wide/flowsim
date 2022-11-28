@@ -49,7 +49,11 @@ class Position(object):
 
     def to_polar(self):
         # Convert point (x, y) to polar coordinates (r, theta).
-        return math.hypot(self.x, self.y), math.atan2(self.y, self.x)/math.pi * 180
+        # theta is in range [0, 360).
+        return (
+            math.hypot(self.x, self.y),
+            (math.atan2(self.y, self.x)/math.pi * 180 + 360) % 360
+        )
 
     def __hash__(self: Position):
         return (int(self.x * (10 ** HASH_ACCURACY_DECIMAL)), 

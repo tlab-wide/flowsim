@@ -178,7 +178,11 @@ class PositionManager(object):
         for numberplate, v in self.vehicles.items():
             x, y = self.traci.vehicle.getPosition(numberplate)
             yaw  = self.traci.vehicle.getAngle(numberplate)
-            self._position[v] = Position(x, y, yaw)
+
+            # Warning: getAngle returns yaw (0 for North, 90 for East, etc.)
+            # Need to convert it to theta (0 for East, 90 for North, etc.)
+            theta = (360 + 90 - yaw) % 360
+            self._position[v] = Position(x, y, theta)
 
 
 class PositionManagerV2(object):
@@ -286,17 +290,21 @@ class PerceptionSimulator(object):
         self.position_manager = scenario.position_manager
 
 
-    def perceive(self, vehicle: Vehicle) -> List[Vehicle]:
-        # Return all perceived vehicles of the given vehicle.
-        candidates = self.position_manager.get_nearby_vehicles(vehicle.position)
+    def perceive(self, ego: Vehicle) -> List[Vehicle]:
+        # Return all perceived vehicles of the given egovehicle.
+        candidates = self.position_manager.get_nearby_vehicles(ego.position)
 
         ret = []
 
         for v in candidates:
             if v == ego: continue # Don't count self.
-            delta = v.position - vehicle.position
-            distance, angle = delta.to_polar()
-            if distance < self.vision_distance and abs(angle) < self.vision_angle:
+
+            distance, angle = (v.position - ego.position).to_polar()
+            # Do not use > here since it may be nan.
+            if (
+                distance < self.vision_distance and 
+                abs(ego.position.heading - angle) < self.vision_angle
+            ):
                 ret.append(v)
 
         return ret
