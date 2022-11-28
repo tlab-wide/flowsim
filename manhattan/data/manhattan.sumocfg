@@ -40,7 +40,7 @@
         <duration-log.statistics value="true"/>
     </report>
 
-    <!-- <gui-settings-file value="viewsettings.xml"/> -->
+    <gui-settings-file value="viewsettings.xml"/>
 
     <random_number>
         <seed value="42"/>
