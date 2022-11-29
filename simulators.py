@@ -229,7 +229,11 @@ class PositionManagerV2(object):
         for numberplate, v in self.vehicles.items():
             x, y = self.traci.vehicle.getPosition(numberplate)
             yaw  = self.traci.vehicle.getAngle(numberplate)
-            self._position[v] = Position(x, y, yaw)
+
+            # Warning: getAngle returns yaw (0 for North, 90 for East, etc.)
+            # Need to convert it to theta (0 for East, 90 for North, etc.)
+            theta = (360 + 90 - yaw) % 360
+            self._position[v] = Position(x, y, theta)
 
         # Recreate grid.
         self._grid = [[set() for _ in range(len(self._grid[0]))] for _ in range(len(self._grid))]
