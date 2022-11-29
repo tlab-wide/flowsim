@@ -30,6 +30,7 @@ class Scenario(object):
         #self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
+        self.match = MatchSimulator(self)
 
     def init_vtp(self):
         # Initialize vehicle type probability from config file.
@@ -134,6 +135,8 @@ class Scenario(object):
         if self.use_gui:
             self.traci.vehicle.setColor(vid, color)
 
+    # Metric collectors.
+
     def collect_recent_saw_by(self) -> VehicleMetric:
         # Collect how many vehicles saw a given vehicle in the last 10 seconds.
 
@@ -142,6 +145,36 @@ class Scenario(object):
         for v0 in self.vehicles.values():
             for v1 in v0.get_module(Planner).recent_seen_vehicles():
                 ret[v1.numberplate] += 1
+
+        return ret
+
+    def collect_prover_matches(self) -> VehicleMetric:
+        # Collect how many match entries of a given prover.
+
+        ret = dict((id, 0) for id in self.vehicles.keys())
+
+        for v in self.vehicles.values():
+            ret[v.numberplate] = len(v.get_module(Prover)._numberplate_to_eid)
+
+        return ret
+
+    def collect_prover_unmatched_eids(self) -> VehicleMetric:
+        # Collect how many unmatched eids of a given prover.
+
+        ret = dict((id, 0) for id in self.vehicles.keys())
+
+        for v in self.vehicles.values():
+            ret[v.numberplate] = len(v.get_module(Prover).unmatched_eids)
+
+        return ret
+
+    def collect_prover_known_numberplates(self) -> VehicleMetric:
+        # Collect how many known numberplates of a given prover.
+
+        ret = dict((id, 0) for id in self.vehicles.keys())
+
+        for v in self.vehicles.values():
+            ret[v.numberplate] = len(v.get_module(Prover).known_numberplates)
 
         return ret
 
@@ -312,3 +345,17 @@ class PerceptionSimulator(object):
                 ret.append(v)
 
         return ret
+
+class MatchSimulator(object):
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
+        self.vehicles = scenario.vehicles
+
+    def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
+        # Match a EID to a numberplate in candidates.
+        # Return the number plate if found, otherwise return None.
+        for n in list(known_numberplates):
+            if self.vehicles[n].eid == eid:
+                return n
+
+        return None

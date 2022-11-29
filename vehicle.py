@@ -94,9 +94,8 @@ class Vehicle(object):
             module = self.get_module(module_class)
             output = module.do_work(input)
 
+            # Break dfs if the current module produces no output.
             if output == None:
-                assert not self._data_flow_map[module_class], \
-                    f"Module {module_class.__name__} should produce CPM if it is not the sink."
                 return
 
             # Handle list of output as well.
@@ -141,7 +140,7 @@ class PoTVehicle(Vehicle):
         (LocalPerception, [PoTProver, Planner]),
         (PoTProver, [CPSSender]),
         (CPSSender, []),
-        (CPSReceiver, [PoTVerifier]),
+        (CPSReceiver, [PoTProver, PoTVerifier]),
         (PoTVerifier, [Planner]),
         (Planner, []),
     ]

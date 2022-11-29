@@ -93,21 +93,81 @@ class CPSReplayer(VehicleModule):
 
         raise NotImplementedError
 
+
 class PoTProver(VehicleModule):
+
+    def __init__(self, vehicle: 'Vehicle'):
+        super().__init__(vehicle)
+
+        # Known numberplates.
+        self.known_numberplates: Set[NumberPlate] = set()
+
+        # EIDs left unmatched.
+        self.unmatched_eids: Set[EID] = set()
+
+        # Two-way Numberplate to EID mapping.
+        # Only latest EID of a Numberplate is recorded.
+        self._eid_to_numberplate: Dict[EID, NumberPlate] = {}
+        self._numberplate_to_eid: Dict[NumberPlate, EID] = {}
+
+    def update_matches(self):
+        # Update match repository.
+
+        for e in list(self.unmatched_eids):
+            n = self.vehicle.scenario.match.match_eid(self.known_numberplates, e)
+
+            if n == None: # No match.
+                continue
+
+            self.unmatched_eids.remove(e)
+
+            self._eid_to_numberplate[e] = n
+            self._numberplate_to_eid[n] = e
+
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
+
+        # Notice modules runs after change_eid(),
+        # so the ego's EID is consistent among modules,
+        # and can be used for detemine source of CPM.
+        if input.sender != self.vehicle.eid:
+            # Received a CPM from another vehicle.
+            # We only need to collect its EID.
+
+            self.unmatched_eids.add(input.sender)
+
+            self.update_matches()
+
+            return None
+
+        # Received a CPM from LocalPerception.
+
+        # Record numberplates from perceived objects.
+        for _, v, _ in input.perceived_objects:
+            self.known_numberplates.add(v.numberplate)
+                
+        # Match!
+        self.update_matches()
+
+        # Generate proofs for all matched vehicles.
 
         # TODO: queue excessive proofs.
         assert input.proofs == []
 
-        self_id = self.vehicle.eid
+        for objid, v, _ in input.perceived_objects:
+            if v.numberplate in self._numberplate_to_eid:
+                input.proofs.append((
+                    objid,
+                    pot_proof(v.eid, v.numberplate, self.vehicle.eid),
+                ))
 
-        proofs = [
-            (objid, pot_proof(v.eid, v.numberplate, self_id))
-            for objid, v, _ in input.perceived_objects
-        ]
+        print("%s: #match = %d, proof = %s" % (
+            self.vehicle.numberplate,
+            len(self._eid_to_numberplate),
+            input.proofs,
+        ))
 
-        return CPM(self_id, input.perceived_objects, proofs)
+        return input
 
 class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
