@@ -161,11 +161,11 @@ class PoTProver(VehicleModule):
                     pot_proof(v.eid, v.numberplate, self.vehicle.eid),
                 ))
 
-        print("%s: #match = %d, proof = %s" % (
-            self.vehicle.numberplate,
-            len(self._eid_to_numberplate),
-            input.proofs,
-        ))
+        #print("%s: #match = %d, #proof = %s" % (
+        #    self.vehicle.numberplate,
+        #    len(self._eid_to_numberplate),
+        #    len(input.proofs),
+        #))
 
         return input
 
@@ -235,5 +235,11 @@ class PoTVerifier(VehicleModule):
             (v, pos) for v, pos in self._unconfirmed_objects.items() if
             v.eid not in self.confirmed_eids
         )
+
+        #print("%s: #confirmed = %d, #unconfirmed = %d" % (
+        #    self.vehicle.numberplate,
+        #    len(confirmed_objects_list),
+        #    len(self._unconfirmed_objects),
+        #))
 
         return CPM(input.sender, confirmed_objects_list)

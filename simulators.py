@@ -3,7 +3,6 @@ from typing import *
 import dataclasses
 import abc
 
-import numba
 import traci
 import math
 
