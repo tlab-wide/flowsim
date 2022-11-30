@@ -59,6 +59,9 @@ class Position(object):
         return (int(self.x * (10 ** HASH_ACCURACY_DECIMAL)), 
                 int(self.y * (10 ** HASH_ACCURACY_DECIMAL)))
 
+    def __repr__(self):
+        return f"({self.x}, {self.y})"
+
 @dataclasses.dataclass
 class CPM(object):
     sender: EID

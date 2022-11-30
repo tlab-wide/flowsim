@@ -26,8 +26,8 @@ class Scenario(object):
         self.vehicles: Dict[str, Vehicle] = {}
 
         # Create simulator modules.
-        self.position_manager = PositionManager(self)
-        #self.position_manager = PositionManagerV2(self)
+        #self.position_manager = PositionManager(self)
+        self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
         self.match = MatchSimulator(self)
@@ -220,7 +220,6 @@ class PositionManager(object):
             # Need to convert it to theta (0 for East, 90 for North, etc.)
             theta = (360 + 90 - yaw) % 360
             self._position[v] = Position(x, y, theta)
-
 
 class PositionManagerV2(object):
     def __init__(self, scenario: Scenario):
