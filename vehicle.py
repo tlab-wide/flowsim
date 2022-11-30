@@ -87,7 +87,7 @@ class Vehicle(object):
         self.position = self.scenario.position_manager.get_vehicle_position(self)
 
     def get_module(self, module_class: Type['Module']) -> 'Module':
-        return self._module_instance_map[module_class]
+        return self._module_instance_map.get(module_class, None)
 
     def do_work(self):
         def _dfs(module_class, input):

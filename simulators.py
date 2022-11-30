@@ -37,6 +37,7 @@ class Scenario(object):
     def init_vtp(self):
         # Initialize vehicle type probability from config file.
         possible_vehicle_types = dict([(i.__name__, i) for i in [
+            NullVehicle,
             UnconnectedVehicle,
             ConnectedVehicle,
             PoTVehicle,
@@ -147,7 +148,10 @@ class Scenario(object):
         ret = dict((id, 0) for id in self.vehicles.keys())
 
         for v0 in self.vehicles.values():
-            for v1 in v0.get_module(Planner).recent_seen_vehicles():
+            module = v0.get_module(Planner)
+            if not module:
+                continue
+            for v1 in module.recent_seen_vehicles():
                 ret[v1.numberplate] += 1
 
         return ret
@@ -158,7 +162,8 @@ class Scenario(object):
         ret = dict((id, 0) for id in self.vehicles.keys())
 
         for v in self.vehicles.values():
-            ret[v.numberplate] = len(v.get_module(Prover)._numberplate_to_eid)
+            module = v.get_module(Prover)
+            ret[v.numberplate] = module and len(module._numberplate_to_eid)
 
         return ret
 
@@ -168,7 +173,8 @@ class Scenario(object):
         ret = dict((id, 0) for id in self.vehicles.keys())
 
         for v in self.vehicles.values():
-            ret[v.numberplate] = len(v.get_module(Prover).unmatched_eids)
+            module = v.get_module(Prover)
+            ret[v.numberplate] = module and len(module.unmatched_eids)
 
         return ret
 
@@ -178,7 +184,8 @@ class Scenario(object):
         ret = dict((id, 0) for id in self.vehicles.keys())
 
         for v in self.vehicles.values():
-            ret[v.numberplate] = len(v.get_module(Prover).known_numberplates)
+            module = v.get_module(Prover)
+            ret[v.numberplate] = module and len(module.known_numberplates)
 
         return ret
 
