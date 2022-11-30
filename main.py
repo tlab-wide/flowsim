@@ -2,7 +2,6 @@
 
 import sys
 import yaml
-import atexit
 from typing import *
 
 from vehicle import *
@@ -20,8 +19,6 @@ def main():
             scenario.collect_metrics()
         except StopIteration:
             break
-
-    atexit.register(lambda: scenario.cleanup())
 
     scenario.cleanup()
     

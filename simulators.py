@@ -1,6 +1,7 @@
 
 from typing import *
 import dataclasses
+import atexit
 import abc
 
 import traci
@@ -30,6 +31,8 @@ class Scenario(object):
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
         self.match = MatchSimulator(self)
+
+        atexit.register(self.cleanup)
 
     def init_vtp(self):
         # Initialize vehicle type probability from config file.
@@ -65,6 +68,8 @@ class Scenario(object):
 
     def cleanup(self):
         self.traci.close()
+
+        atexit.unregister(self.cleanup)
 
     def generate_vehicle(self, vid: str):
         # Generate one vehicle with specified id.
