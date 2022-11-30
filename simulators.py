@@ -37,7 +37,6 @@ class Scenario(object):
     def init_vtp(self):
         # Initialize vehicle type probability from config file.
         possible_vehicle_types = dict([(i.__name__, i) for i in [
-            NullVehicle,
             UnconnectedVehicle,
             ConnectedVehicle,
             PoTVehicle,
