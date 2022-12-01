@@ -65,14 +65,16 @@ class Position(object):
 @dataclasses.dataclass
 class CPM(object):
     sender: EID
-    perceived_objects: List[Tuple[int, Vehicle, Position]] = dataclasses.field(default_factory=lambda: [])
+    perceived_objects: List[Tuple[int, Position]] = dataclasses.field(default_factory=lambda: [])
     proofs: List[Tuple[int, Proof]] = dataclasses.field(default_factory=lambda: [])
-    _is_fake: bool = False
+    _objid_to_numberplate: Dict[int, NumberPlate] = dataclasses.field(default_factory=lambda: {})
+    _gt_is_fake: bool = False
 
     def verify(self):
         # Sanity checks to determine whether it is elligible to send on wire.
         assert isinstance(self.sender, EID)
         assert self.sender != ""
+        assert self._objid_to_numberplate == {}
         assert len(self.perceived_objects) <= 128
         assert len(self.proofs) <= 8
 
@@ -85,8 +87,12 @@ def pot_proof(eid: EID, plate: str, salt: EID) -> Proof:
     # XXX: Dummy implementation atm.
     return f"{eid}#{plate}#{salt}".encode()
 
-def pot_pubkey(proof: Proof) -> Pubkey:
+def pot_pubkey(proof: Proof, salt: EID) -> Pubkey:
     # XXX: Dummy implementation atm.
-    eid, plate, salt = proof.decode().split('#')
+    eid, plate, salt_ = proof.decode().split('#')
+
+    if salt != salt_:
+        return None
+
     return f"{eid}#{plate}".encode()
 

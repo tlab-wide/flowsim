@@ -32,7 +32,8 @@ class LocalPerception(VehicleModule):
 
         return CPM(
             sender=self.vehicle.eid,
-            perceived_objects = [(None, v, v.position) for v in new_objects],
+            perceived_objects = [(oid, pos) for oid, pos, num in new_objects],
+            _objid_to_numberplate = dict((oid, num) for oid, pos, num in new_objects),
         )
 
 class Planner(VehicleModule):
@@ -42,7 +43,7 @@ class Planner(VehicleModule):
 
         super().__init__(vehicle)
 
-        self.vehicle_seen: List[set] = []
+        self.obj_seen: List[set] = []
 
         self.then = -1
 
@@ -53,17 +54,17 @@ class Planner(VehicleModule):
 
         if self.then != now:
             self.then = now
-            self.vehicle_seen.insert(0, set())
-            if len(self.vehicle_seen) > 10:
-                self.vehicle_seen.pop()
+            self.obj_seen.insert(0, set())
+            if len(self.obj_seen) > 10:
+                self.obj_seen.pop()
 
-        for _, v, pos in input.perceived_objects:
-            self.vehicle_seen[0].add(v)
+        for objid, pos in input.perceived_objects:
+            self.obj_seen[0].add(objid)
 
         return None
 
-    def recent_seen_vehicles(self) -> Set['Vehicle']:
-        return functools.reduce(lambda x, y: x.union(y), self.vehicle_seen, set())
+    def recent_seen_objids(self) -> Set[int]:
+        return functools.reduce(lambda x, y: x.union(y), self.obj_seen, set())
 
 class CPSReceiver(VehicleModule):
     def do_work(self, input: None) -> List[CPM]:
@@ -143,9 +144,8 @@ class PoTProver(VehicleModule):
         # Received a CPM from LocalPerception.
 
         # Record numberplates from perceived objects.
-        for _, v, _ in input.perceived_objects:
-            self.known_numberplates.add(v.numberplate)
-                
+        self.known_numberplates.union(input._objid_to_numberplate.values())
+
         # Match!
         self.update_matches()
 
@@ -154,12 +154,19 @@ class PoTProver(VehicleModule):
         # TODO: queue excessive proofs.
         assert input.proofs == []
 
-        for objid, v, _ in input.perceived_objects:
-            if v.numberplate in self._numberplate_to_eid:
-                input.proofs.append((
-                    objid,
-                    pot_proof(v.eid, v.numberplate, self.vehicle.eid),
-                ))
+        for objid, pos in input.perceived_objects:
+            numberplate = input._objid_to_numberplate[objid]
+            eid = self._numberplate_to_eid.get(numberplate, None)
+
+            if not eid: # No match.
+                continue
+
+            input.proofs.append((
+                objid,
+                pot_proof(numberplate, eid, self.vehicle.eid),
+            ))
+
+        input._objid_to_numberplate = {}
 
         #print("%s: #match = %d, #proof = %s" % (
         #    self.vehicle.numberplate,
@@ -174,72 +181,60 @@ class PoTVerifier(VehicleModule):
 
         super().__init__(vehicle)
 
-        self.confirmed_eids = set()
-
-        self.confirmed_proofs: Dict[Pubkey, EID] = {}   # value: Target EID
-        self.unconfirmed_proofs: Dict[Pubkey, EID] = {} # value: Sender EID
+        self.pubkey_to_provers: Dict[Pubkey, set] = {}
 
         self._unconfirmed_objects: Dict['Vehicle', Position] = {}
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
-        self.update_proof_db(input)
+        if input.proofs:
+            import pdb; pdb.set_trace()
 
-        self.stage_objects(input)
-
-        return self.flush_objects(input)
-
-    def _get_obj_by_objid(self, input: CPM, objid: int) -> 'Vehicle':
-        for o, v, _ in input.perceived_objects:
-            if o == objid:
-                return v
-        raise ValueError("Object not found in CPM")
-
-    def update_proof_db(self, input: CPM):
+        # Generate pubkey from proofs and store them.
+        objid_to_pubkey: Dict[int, Pubkey] = {}
         for objid, p in input.proofs:
-            pubkey = utils.pot_pubkey(p)
+            pubkey = utils.pot_pubkey(p, input.sender)
 
-            # If the pubkey is already confirmed, do nothing.
-            if pubkey in self.confirmed_proofs:
+            if pubkey == None:
+                # It is not a valid proof.
                 continue
 
-            # If the pubkey is seen for the first time, add it to unconfirmed.
-            if pubkey not in self.unconfirmed_proofs:
-                self.unconfirmed_proofs[pubkey] = input.sender
+            objid_to_pubkey[objid] = pubkey
 
-            if input.sender != self.unconfirmed_proofs[pubkey]:
-                # We found a confirmed proof!
-                target_id = self._get_obj_by_objid(input, objid).eid
+            if pubkey not in self.pubkey_to_provers:
+                self.pubkey_to_provers[pubkey] = set()
+            
+            self.pubkey_to_provers[pubkey].add(input.sender)
 
-                self.confirmed_eids.add(target_id)
+        # Stage objects.
+        for oid, pos in input.perceived_objects:
+            self._unconfirmed_objects[oid] = pos
 
-                self.confirmed_proofs[pubkey] = target_id
-                del self.unconfirmed_proofs[pubkey]
+        # Filter confirmed and unconfirmed objects.
+        confirmed = []
+        unconfirmed = []
 
-    def stage_objects(self, input: CPM):
-        # XXX: Actually, we don't need to stage unconfirmed objects in this implementation,
-        # since we assume that the proofs always comes along with the corresponding fresh objects.
-        for o, v, pos in input.perceived_objects:
-            self._unconfirmed_objects[v] = pos
+        for oid, pos in self._unconfirmed_objects.items():
+            # The Object didn't come with a proof, ignore.
+            if oid not in objid_to_pubkey:
+                unconfirmed.append((oid, pos))
+                continue
 
-    def flush_objects(self, input: CPM) -> CPM:
+            provers = self.pubkey_to_provers.get(objid_to_pubkey[oid], set())
 
-        confirmed_objects_list = [
-            (None, v, pos) for v, pos in self._unconfirmed_objects.items() if
-            v.eid in self.confirmed_eids
-        ]
+            if len(provers) < 2:
+                unconfirmed.append((oid, pos))
+                continue
 
-        # Update still unconfirmed objects.
-        self._unconfirmed_objects = dict(
-            (v, pos) for v, pos in self._unconfirmed_objects.items() if
-            v.eid not in self.confirmed_eids
-        )
+            confirmed.append((oid, pos))
+
+        self._unconfirmed_objects = dict(unconfirmed)
 
         #print("%s: #confirmed = %d, #unconfirmed = %d" % (
         #    self.vehicle.numberplate,
-        #    len(confirmed_objects_list),
-        #    len(self._unconfirmed_objects),
+        #    len(confirmed),
+        #    len(unconfirmed),
         #))
 
-        return CPM(input.sender, confirmed_objects_list)
+        return CPM(input.sender, confirmed)

@@ -151,12 +151,13 @@ class Scenario(object):
 
         ret = dict((id, 0) for id in self.vehicles.keys())
 
-        for v0 in self.vehicles.values():
-            module = v0.get_module(Planner)
+        for v in self.vehicles.values():
+            module = v.get_module(Planner)
             if not module:
                 continue
-            for v1 in module.recent_seen_vehicles():
-                ret[v1.numberplate] += 1
+            for objid in module.recent_seen_objids():
+                numberplate = self.perception._gt_objectid_to_numberplate[objid]
+                ret[numberplate] += 1
 
         return ret
 
@@ -340,9 +341,16 @@ class PerceptionSimulator(object):
 
         self.position_manager = scenario.position_manager
 
+        # Ground truth.
+        # Note that one numberplate can have multiple object ids.
+        # This happens when a vehicle changes its EID.
+        self._gt_eid_to_objectid: Dict[EID, int] = {}
+        self._gt_objectid_to_eid: List[EID] = []
+        self._gt_objectid_to_numberplate: List[NumberPlate] = []
 
-    def perceive(self, ego: Vehicle) -> List[Vehicle]:
-        # Return all perceived vehicles of the given egovehicle.
+
+    def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
+        # Return all perceived objects and their positions of the given egovehicle.
         candidates = self.position_manager.get_nearby_vehicles(ego.position)
 
         ret = []
@@ -356,7 +364,19 @@ class PerceptionSimulator(object):
                 distance < self.vision_distance and 
                 abs(ego.position.heading - angle) < self.vision_angle
             ):
-                ret.append(v)
+
+                # Record the ground truth if not already.
+                # Object ID will be automatically assigned.
+                if v.eid not in self._gt_eid_to_objectid:
+                    self._gt_eid_to_objectid[v.eid] = len(self._gt_objectid_to_eid)
+                    self._gt_objectid_to_eid.append(v.eid)
+                    self._gt_objectid_to_numberplate.append(v.numberplate)
+
+                ret.append((
+                    self._gt_eid_to_objectid[v.eid],
+                    v.position,
+                    v.numberplate,
+                ))
 
         return ret
 
