@@ -26,8 +26,8 @@ class Scenario(object):
         self.vehicles: Dict[str, Vehicle] = {}
 
         # Create simulator modules.
-        #self.position_manager = PositionManager(self)
-        self.position_manager = PositionManagerV2(self)
+        self.position_manager = PositionManager(self)
+        #self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
         self.match = MatchSimulator(self)
@@ -105,12 +105,17 @@ class Scenario(object):
             self.vehicles[vid].stop()
             del self.vehicles[vid]
 
-        # Let position manager to update vehicles' position.
-        self.position_manager.update_all_position()
+        # Give vehicles chance to thange their EIDs and let match simulator know.
+        [ v.possibly_change_eid() for v in self.vehicles.values()]
+        self.match.update_eids()
 
+        # Let position manager to update vehicles' position and update to all vehicles.
+        self.position_manager.update_all_position()
+        [v.update_position() for v in self.vehicles.values()]
+        
         # Do a tick for every running vehicles.
         for v in self.vehicles.values():
-            v.tick()
+            v.do_work()
 
     def collect_metrics(self):
         # Collect metrics from all vehicles.
@@ -360,11 +365,24 @@ class MatchSimulator(object):
         self.scenario = scenario
         self.vehicles = scenario.vehicles
 
+        self.eid_to_numberplate: Dict[EID, NumberPlate] = {}
+
+    def update_eids(self):
+        for numberplate, v in self.vehicles.items():
+            self.eid_to_numberplate[v.eid] = numberplate
+    
     def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
         # Match a EID to a numberplate in candidates.
         # Return the number plate if found, otherwise return None.
-        for n in list(known_numberplates):
-            if self.vehicles[n].eid == eid:
-                return n
-
+        if self.eid_to_numberplate[eid] in known_numberplates:
+            return self.eid_to_numberplate[eid]
         return None
+
+    #def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
+    #    # Match a EID to a numberplate in candidates.
+    #    # Return the number plate if found, otherwise return None.
+    #    for n in list(known_numberplates):
+    #        if self.vehicles[n].eid == eid:
+    #            return n
+
+    #    return None

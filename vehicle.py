@@ -69,13 +69,6 @@ class Vehicle(object):
     def __hash__(self):
         return hash(self.numberplate)
 
-    def tick(self):
-        # The upper level tick function.
-
-        self.update_position()
-        self.possibly_change_eid()
-        self.do_work()
-
     def change_eid(self):
         self.eid = '%064x' % (self.random.randint(0, 2**256 - 1))
 
@@ -90,6 +83,8 @@ class Vehicle(object):
         return self._module_instance_map.get(module_class, None)
 
     def do_work(self):
+        # Flow the actual modules.
+
         def _dfs(module_class, input):
             module = self.get_module(module_class)
             output = module.do_work(input)
@@ -113,9 +108,6 @@ class Vehicle(object):
         for i in self._source_modules:
             # DFS into the module flow tree.
             _dfs(i, None)
-
-    def __hash__(self):
-        return hash(self.numberplate)
 
 # =========================================
 #   Definition of different vehicle types
