@@ -86,7 +86,22 @@ class CPSSpammer(VehicleModule):
     def do_work(self, input: None) -> CPM:
         assert input == None, f"Module {self.__class__.__name__} requires no input."
 
-        raise NotImplementedError
+        random = self.vehicle.random
+        pos = self.vehicle.position
+
+        objects = [
+            (
+                random.randint(0, 10000),
+                Position(
+                    pos.x + random.randint(-100, 100),
+                    pos.y + random.randint(-100, 100),
+                    random.random() * 360,
+                ),
+            )
+            for i in range(random.randint(0, 32))
+        ]
+
+        return CPM(self.vehicle.eid, objects, _gt_is_fake = True)
 
 class CPSReplayer(VehicleModule):
     def do_work(self, input: None) -> CPM:

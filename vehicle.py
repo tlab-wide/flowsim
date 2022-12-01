@@ -145,7 +145,7 @@ class SpamAttacker(MaliciousVehicle):
         (LocalPerception, [CPSSender, Planner]),
         (CPSSender, []),
         (CPSReceiver, [Planner]),
-        (CPSSpammer, []),
+        (CPSSpammer, [CPSSender]),
         (Planner, []),
     ]
 
