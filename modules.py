@@ -144,7 +144,7 @@ class PoTProver(VehicleModule):
         # Received a CPM from LocalPerception.
 
         # Record numberplates from perceived objects.
-        self.known_numberplates.union(input._objid_to_numberplate.values())
+        self.known_numberplates |= set(input._objid_to_numberplate.values())
 
         # Match!
         self.update_matches()
@@ -168,6 +168,12 @@ class PoTProver(VehicleModule):
 
         input._objid_to_numberplate = {}
 
+        #print("%s: #known_numberplates = %d, #unmatched_eids = %d" % (
+        #    self.vehicle.numberplate,
+        #    len(self.known_numberplates),
+        #    len(self.unmatched_eids),
+        #))
+
         #print("%s: #match = %d, #proof = %s" % (
         #    self.vehicle.numberplate,
         #    len(self._eid_to_numberplate),
@@ -187,9 +193,6 @@ class PoTVerifier(VehicleModule):
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
-
-        if input.proofs:
-            import pdb; pdb.set_trace()
 
         # Generate pubkey from proofs and store them.
         objid_to_pubkey: Dict[int, Pubkey] = {}
@@ -231,10 +234,10 @@ class PoTVerifier(VehicleModule):
 
         self._unconfirmed_objects = dict(unconfirmed)
 
-        #print("%s: #confirmed = %d, #unconfirmed = %d" % (
-        #    self.vehicle.numberplate,
-        #    len(confirmed),
-        #    len(unconfirmed),
-        #))
+        print("%s: #confirmed = %d, #unconfirmed = %d" % (
+            self.vehicle.numberplate,
+            len(confirmed),
+            len(unconfirmed),
+        ))
 
         return CPM(input.sender, confirmed)
