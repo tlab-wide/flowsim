@@ -9,9 +9,9 @@ seed: 42
 use_gui: false
 
 vehicle_type_probabilities:
-  UnconnectedVehicle: 0.33
-  ConnectedVehicle: 0.33
-  PoTVehicle: 0.33
+  UnconnectedVehicle: 0.
+  ConnectedVehicle: 0.
+  PoTVehicle: 0.99
   SilenceAttacker: 0.01
   SpamAttacker: 0.
   ReplayAttacker: 0.

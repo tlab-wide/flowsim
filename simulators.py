@@ -368,21 +368,17 @@ class MatchSimulator(object):
         self.eid_to_numberplate: Dict[EID, NumberPlate] = {}
 
     def update_eids(self):
-        for numberplate, v in self.vehicles.items():
-            self.eid_to_numberplate[v.eid] = numberplate
-    
+        # Update EIDs of all vehicles.
+        # Only keep the latest EID of each vehicle.
+
+        self.eid_to_numberplate = dict(
+            (v.eid, v.numberplate) for v in self.vehicles.values()
+        )
+
     def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
         # Match a EID to a numberplate in candidates.
         # Return the number plate if found, otherwise return None.
-        if self.eid_to_numberplate[eid] in known_numberplates:
+        if self.eid_to_numberplate.get(eid, None) in known_numberplates:
             return self.eid_to_numberplate[eid]
         return None
 
-    #def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
-    #    # Match a EID to a numberplate in candidates.
-    #    # Return the number plate if found, otherwise return None.
-    #    for n in list(known_numberplates):
-    #        if self.vehicles[n].eid == eid:
-    #            return n
-
-    #    return None
