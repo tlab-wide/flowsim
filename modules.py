@@ -232,12 +232,13 @@ class PoTVerifier(VehicleModule):
 
             confirmed.append((oid, pos))
 
-        self._unconfirmed_objects = dict(unconfirmed)
+        #print("%s: #total = %d, #confirmed = %d, #still_unconfirmed = %d" % (
+        #    self.vehicle.numberplate,
+        #    len(self._unconfirmed_objects),
+        #    len(confirmed),
+        #    len(unconfirmed),
+        #))
 
-        print("%s: #confirmed = %d, #unconfirmed = %d" % (
-            self.vehicle.numberplate,
-            len(confirmed),
-            len(unconfirmed),
-        ))
+        self._unconfirmed_objects = dict(unconfirmed)
 
         return CPM(input.sender, confirmed)
