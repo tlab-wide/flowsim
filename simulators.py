@@ -150,14 +150,18 @@ class Scenario(object):
         # Collect how many vehicles saw a given vehicle in the last 10 seconds.
 
         ret = dict((id, 0) for id in self.vehicles.keys())
+        ret[UNKNOWN_PLATE] = 0
 
         for v in self.vehicles.values():
             module = v.get_module(Planner)
             if not module:
                 continue
             for objid in module.recent_seen_objids():
-                numberplate = self.perception._gt_objectid_to_numberplate[objid]
-                ret[numberplate] += 1
+                try:
+                    numberplate = self.perception._gt_objectid_to_numberplate[objid]
+                    ret[numberplate] += 1
+                except IndexError:
+                    ret[UNKNOWN_PLATE] += 1
 
         return ret
 

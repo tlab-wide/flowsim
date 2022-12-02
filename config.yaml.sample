@@ -11,9 +11,9 @@ use_gui: false
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
   ConnectedVehicle: 0.
-  PoTVehicle: 0.99
-  SilenceAttacker: 0.01
-  SpamAttacker: 0.
+  PoTVehicle: 0.9
+  SilenceAttacker: 0.
+  SpamAttacker: 0.1
   ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.
@@ -30,3 +30,4 @@ perception_simulator:
 
 vehicle:
   eid_changing_possibility: 0.0001
+  pot_verifier_max_unverified_per_vehicle: 20

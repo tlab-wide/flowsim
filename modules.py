@@ -77,6 +77,10 @@ class CPSSender(VehicleModule):
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
+        # Canonicalize the CPM.
+        input.sender = self.vehicle.eid
+        input._objid_to_numberplate = {}
+
         input.verify()
 
         self.vehicle.scenario.network.broadcast(self.vehicle, input)
@@ -204,12 +208,13 @@ class PoTVerifier(VehicleModule):
 
         self.pubkey_to_provers: Dict[Pubkey, set] = {}
 
-        self._unconfirmed_objects: Dict['Vehicle', Position] = {}
+        self._unconfirmed_objects: Dict[int, Position] = {}
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
         # Generate pubkey from proofs and store them.
+        # TODO: limit the number of unmatched proofs per sender.
         objid_to_pubkey: Dict[int, Pubkey] = {}
         for objid, p in input.proofs:
             pubkey = utils.pot_pubkey(p, input.sender)
@@ -227,7 +232,9 @@ class PoTVerifier(VehicleModule):
 
         # Stage objects.
         for oid, pos in input.perceived_objects:
-            self._unconfirmed_objects[oid] = pos
+            # Only stage objects with valid proof.
+            if oid in objid_to_pubkey:
+                self._unconfirmed_objects[oid] = pos
 
         # Filter confirmed and unconfirmed objects.
         confirmed = []

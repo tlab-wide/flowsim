@@ -29,6 +29,9 @@ Pubkey = bytes
 VehicleMetric = Dict[NumberPlate, int]
 GlobalMetric = int
 
+# Define Unknown vehicle's number plate.
+UNKNOWN_PLATE = 'UNKNOWN'
+
 def random_from(parent: Union[random.Random, int]) -> random.Random:
     # Derive a new Random instance from an existing Random or an integer seed.
     if isinstance(parent, random.Random) or parent == random:
