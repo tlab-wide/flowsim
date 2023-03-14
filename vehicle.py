@@ -114,12 +114,14 @@ class Vehicle(object):
 # =========================================
 
 class UnconnectedVehicle(Vehicle):
+    # A standalone vehicle which does not connect to the V2X network.
     data_flow = [
         (LocalPerception, [Planner]),
         (Planner, []),
     ]
 
 class ConnectedVehicle(Vehicle):
+    # A standard vehicle which connects to the V2X network and can send and receive CPMs.
     data_flow = [
         (LocalPerception, [CPSSender, Planner]),
         (CPSSender, []),
@@ -128,6 +130,7 @@ class ConnectedVehicle(Vehicle):
     ]
 
 class PoTVehicle(Vehicle):
+    # A vehicle which can send and receive PoT CPMs.
     data_flow = [
         (LocalPerception, [PoTProver, Planner]),
         (PoTProver, [CPSSender]),
@@ -138,9 +141,10 @@ class PoTVehicle(Vehicle):
     ]
 
 class MaliciousVehicle(Vehicle):
-    _is_malicious = True
+    _gt_is_malicious = True
 
 class SpamAttacker(MaliciousVehicle):
+    # A malicious vehicle which sends out random spam CPMs.
     data_flow = [
         (LocalPerception, [CPSSender, Planner]),
         (CPSSender, []),
@@ -150,6 +154,7 @@ class SpamAttacker(MaliciousVehicle):
     ]
 
 class ReplayAttacker(MaliciousVehicle):
+    # A vehicle which replays the CPMs it received.
     data_flow = [
         (LocalPerception, [CPSSender, CPSReplayer, Planner]),
         (CPSSender, []),
@@ -159,6 +164,7 @@ class ReplayAttacker(MaliciousVehicle):
     ]
 
 class SilenceAttacker(MaliciousVehicle):
+    # A vehicle which does not send any CPMs.
     data_flow = [
         (LocalPerception, [Planner]),
         (CPSReceiver, [PoTVerifier]),
@@ -167,5 +173,13 @@ class SilenceAttacker(MaliciousVehicle):
     ]
 
 class SybilAttacker(MaliciousVehicle):
+    # A vehicle which pretends to be two vehicles to perform a Sybil attack.
     pass
-
+#    data_flow = [
+#        (LocalPerception, [PoTProver2, Planner]),
+#        (PoTProver2, [CPSSender]),
+#        (CPSSender, []),
+#        (CPSReceiver, [PoTProver2, PoTVerifier]),
+#        (PoTVerifier, [Planner]),
+#        (Planner, []),
+#    ]
