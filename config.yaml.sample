@@ -6,12 +6,12 @@ sumo_config_path: "manhattan/data/manhattan.sumocfg"
 
 seed: 42
 
-use_gui: false
+use_gui: false #true
 
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
-  ConnectedVehicle: 0.
-  PoTVehicle: 0.9
+  ConnectedVehicle: 0.1
+  PoTVehicle: 0.8
   SilenceAttacker: 0.
   SpamAttacker: 0.1
   ReplayAttacker: 0.

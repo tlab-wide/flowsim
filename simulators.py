@@ -97,6 +97,7 @@ class Scenario(object):
         for vid in self.traci.simulation.getDepartedIDList():
             if vid not in self.vehicles:
                 self.vehicles[vid] = self.generate_vehicle(vid)
+                #print("New %s: %s" % (self.vehicles[vid].__class__.__name__, vid))
 
                 # Set default color.
                 self.set_vehicle_color(vid, (128, 128, 128, 255))
@@ -122,6 +123,9 @@ class Scenario(object):
 
         recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
 
+        vehicle_sent_bytes: VehicleMetric = self.collect_vehicle_sent_bytes()
+        print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
+
         if not self.use_gui:
             print('recent_saw_by = %s' % recent_saw_by)
 
@@ -139,12 +143,29 @@ class Scenario(object):
 
             self.set_vehicle_color(vid, (r, g, b, 255))
 
+
+    def collect_final_metrics(self):
+        # Collect final metrics from all vehicles.
+        pass
+
     def set_vehicle_color(self, vid: str, color: Tuple[int, int, int, int]):
         # Set vehicle color if gui is enabled.
         if self.use_gui:
             self.traci.vehicle.setColor(vid, color)
 
     # Metric collectors.
+
+    def collect_vehicle_sent_bytes(self) -> VehicleMetric:
+        # Collect how many bytes a vehicle sent in this tick.
+        ret = dict((id, 0) for id in self.vehicles.keys())
+
+        for v in self.vehicles.values():
+            ret[v.numberplate] += self.network.bytes_sent[v]
+
+        # XXX: reset bytes_sent here.
+        self.network.bytes_sent = {}
+
+        return ret
 
     def collect_recent_saw_by(self) -> VehicleMetric:
         # Collect how many vehicles saw a given vehicle in the last 10 seconds.
@@ -313,8 +334,15 @@ class NetworkSimulator(object):
         # Assign a receive buffer for each vehicle
         self.receive_buffers = {}
 
+        self.bytes_sent = {}
+
     def broadcast(self, sender: Vehicle, message: object) -> int:
         # Broadcast a message to vehicles in range and return number of receipents.
+
+        # Accumulate number of bytes sent.
+        self.bytes_sent[sender] = self.bytes_sent.get(sender, 0) + len(message)
+
+        # Get receipents.
         receivers = self.position_manager.get_nearby_vehicles(sender.position)
         for v in receivers:
             if v == sender: continue # Don't send to self.

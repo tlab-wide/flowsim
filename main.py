@@ -20,6 +20,8 @@ def main():
         except StopIteration:
             break
 
+    scenario.collect_final_metrics()
+
     scenario.cleanup()
     
 
