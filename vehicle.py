@@ -109,6 +109,10 @@ class Vehicle(object):
             # DFS into the module flow tree.
             _dfs(i, None)
 
+        # Flush all modules.
+        for i in self._module_instance_map.values():
+            i.flush()
+
 # =========================================
 #   Definition of different vehicle types
 # =========================================

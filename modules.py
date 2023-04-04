@@ -17,6 +17,9 @@ class VehicleModule(metaclass=abc.ABCMeta):
     def do_work(self, input: CPM) -> CPM:
         return input
 
+    def flush(self):
+        pass
+
 # =============================================================================
 #                              Basic modules
 # =============================================================================
