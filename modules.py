@@ -17,7 +17,7 @@ class VehicleModule(metaclass=abc.ABCMeta):
     def do_work(self, input: CPM) -> CPM:
         return input
 
-    def flush(self):
+    def flush(self) -> None:
         pass
 
 # =============================================================================
@@ -80,17 +80,32 @@ class CPSReceiver(VehicleModule):
         
 
 class CPSSender(VehicleModule):
+    def __init__(self, vehicle: 'Vehicle'):
+        super().__init__(vehicle)
+
+        self.cpms_to_send: List[CPM] = []
+
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
+        cpm = input.copy()
+
         # Canonicalize the CPM.
-        input.sender = self.vehicle.eid
-        input._objid_to_numberplate = {}
+        cpm.sender = self.vehicle.eid
+        cpm._objid_to_numberplate = {}
 
-        input.verify()
+        self.cpms_to_send.append(cpm)
 
-        self.vehicle.scenario.network.broadcast(self.vehicle, input)
         return None
+
+    def flush(self) -> None:
+        # Join all CPMs generated in this tick and flush it to the network.
+
+        cpm = sum(self.cpms_to_send)
+        cpm.verify()
+
+        self.vehicle.scenario.network.broadcast(self.vehicle, cpm)
+
 
 # =============================================================================
 #                                 PoT modules

@@ -83,8 +83,35 @@ class CPM(object):
 
     def __len__(self):
         # Calculate the total length of the actual CPM packet.
-        raise NotImplementedError
 
+        return (
+            34 +                               # 802.11p MAC header.
+            4 +                                # GN basic header.
+            177 +                              # GN security header.
+            68 +                               # GN security trailer.
+            8 +                                # GN common header.
+            28 +                               # GN SHB header.
+            4 +                                # BTP-B header.
+            63 +                               # CPM static portion.
+            len(self.perceived_objects) * 52 + # Perceived objects.
+            len(self.proofs) * 71              # Proofs.
+        )
+
+    def __add__(self, other: CPM):
+        # Merge two CPMs.
+
+        assert self.sender == other.sender
+        assert self._objid_to_numberplate == other._objid_to_numberplate == {}
+
+        # Result is considered fake if any of the two is fake.
+
+        return CPM(
+            sender = self.sender,
+            perceived_objects = self.perceived_objects + other.perceived_objects,
+            proofs = self.proofs + other.proofs,
+            _objid_to_numberplate = {},
+            _gt_is_fake = self._gt_is_fake or other._gt_is_fake,
+        )
 
 def pot_proof(eid: EID, plate: str, salt: EID) -> Proof:
     # XXX: Dummy implementation atm.
