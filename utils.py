@@ -6,6 +6,8 @@ import os
 import sys
 import math
 import random
+import numpy as np
+import pandas
 from typing import *
 
 if 'SUMO_HOME' in os.environ:
@@ -16,7 +18,6 @@ else:
 
 import traci
 import dataclasses
-import numpy as np
 
 
 # Define types.
@@ -26,8 +27,35 @@ Proof = bytes
 Pubkey = bytes
 
 # Define metric types.
-VehicleMetric = Dict[NumberPlate, int]
-GlobalMetric = int
+VehicleMetric = Dict[NumberPlate, float]
+GlobalMetric = float
+
+class MetricCollector:
+    def __init__(self, filename: str, collect_function: Callable[[], Union[GlobalMetric, VehicleMetric]], metric_type: str = None):
+        self.filename = filename
+        self.collect_function = collect_function
+
+        # Check which type of metric is being collected.
+        if metric_type is None:
+            # Infer metric type from return type of collect_function.
+            if collect_function.__annotations__['return'] == GlobalMetric:
+                metric_type = 'global'
+            elif collect_function.__annotations__['return'] == VehicleMetric:
+                metric_type = 'vehicle'
+            else:
+                raise TypeError('Invalid metric type.')
+        self.metric_type = metric_type
+
+        self.data = []
+
+    def collect(self) -> None:
+        self.data.append(self.collect_function())
+
+    def save(self):
+        if self.metric_type == 'global':
+            pandas.DataFrame(self.data, columns=['value']).to_csv(self.filename, columns=['value'], index=False)
+        elif self.metric_type == 'vehicle':
+            pandas.DataFrame(self.data).to_csv(self.filename, index=False)
 
 # Define Unknown vehicle's number plate.
 UNKNOWN_PLATE = 'UNKNOWN'
@@ -59,8 +87,10 @@ class Position(object):
         )
 
     def __hash__(self: Position):
-        return (int(self.x * (10 ** HASH_ACCURACY_DECIMAL)), 
-                int(self.y * (10 ** HASH_ACCURACY_DECIMAL)))
+        return (
+            int(self.x * (10 ** HASH_ACCURACY_DECIMAL)) * (10 ** HASH_ACCURACY_DECIMAL) +
+            int(self.y * (10 ** HASH_ACCURACY_DECIMAL))
+        )
 
     def __repr__(self):
         return f"({self.x}, {self.y})"

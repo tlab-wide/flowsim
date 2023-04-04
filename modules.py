@@ -88,7 +88,7 @@ class CPSSender(VehicleModule):
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
-        cpm = input.copy()
+        cpm = copy.copy(input)
 
         # Canonicalize the CPM.
         cpm.sender = self.vehicle.eid
@@ -101,8 +101,13 @@ class CPSSender(VehicleModule):
     def flush(self) -> None:
         # Join all CPMs generated in this tick and flush it to the network.
 
-        cpm = sum(self.cpms_to_send)
+        cpm = sum(self.cpms_to_send, CPM(sender=self.vehicle.eid))
         cpm.verify()
+        self.cpms_to_send = []
+
+        # Do not send empty CPMs.
+        if len(cpm.perceived_objects) == 0 and len(cpm.proofs) == 0:
+            return
 
         self.vehicle.scenario.network.broadcast(self.vehicle, cpm)
 

@@ -17,6 +17,7 @@ class Scenario(object):
         self.traci = traci
         self.config = config
         self.use_gui = self.config['use_gui']
+        self.output_dir = self.config['output_dir']
         
         self.init_sumo()
         self.init_vtp()
@@ -31,6 +32,21 @@ class Scenario(object):
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
         self.match = MatchSimulator(self)
+
+        # Create metric collectors.
+        os.makedirs(self.output_dir, exist_ok=True)
+        format_dir = lambda x: os.path.join(self.output_dir, x)
+
+        self.metric_collectors = {
+            'latitude': MetricCollector(format_dir('latitude.csv'), lambda: {
+                vid: v.position.x for vid, v in self.vehicles.items()
+            }, metric_type = 'vehicle'),
+            'longitude': MetricCollector(format_dir('longitude.csv'), lambda: {
+                vid: v.position.y for vid, v in self.vehicles.items()
+            }, metric_type = 'vehicle'),
+            'recent_saw_by': MetricCollector(format_dir('recent_saw_by.csv'), self.collect_recent_saw_by),
+            'bytes_sent': MetricCollector(format_dir('bytes_sent.csv'), self.collect_vehicle_sent_bytes),
+        }
 
         atexit.register(self.cleanup)
 
@@ -67,6 +83,11 @@ class Scenario(object):
         self.end_time = self.traci.simulation.getEndTime()
 
     def cleanup(self):
+        self.collect_final_metrics()
+
+        for mc in self.metric_collectors.values():
+            mc.save()
+
         self.traci.close()
 
         atexit.unregister(self.cleanup)
@@ -121,13 +142,19 @@ class Scenario(object):
     def collect_metrics(self):
         # Collect metrics from all vehicles.
 
-        recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
+        [i.collect() for i in self.metric_collectors.values()]
 
-        vehicle_sent_bytes: VehicleMetric = self.collect_vehicle_sent_bytes()
-        print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
+        #recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
 
-        if not self.use_gui:
-            print('recent_saw_by = %s' % recent_saw_by)
+        #vehicle_sent_bytes: VehicleMetric = self.collect_vehicle_sent_bytes()
+        #print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
+
+        recent_saw_by = self.metric_collectors['recent_saw_by'].data[-1]
+        vehicle_sent_bytes =  self.metric_collectors['bytes_sent'].data[-1]
+
+        #if not self.use_gui:
+        #    print('recent_saw_by = %s' % recent_saw_by)
+        #    print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
 
         def _normalize_color(n, max_ = 10, min_ = 0) -> int:
             # Normalize and clip a number to 0-255.
@@ -159,8 +186,11 @@ class Scenario(object):
         # Collect how many bytes a vehicle sent in this tick.
         ret = dict((id, 0) for id in self.vehicles.keys())
 
-        for v in self.vehicles.values():
-            ret[v.numberplate] += self.network.bytes_sent[v]
+        for v, b in self.network.bytes_sent.items():
+            ret[v.numberplate] += b
+
+        #for v in self.vehicles.values():
+        #    ret[v.numberplate] += self.network.bytes_sent[v]
 
         # XXX: reset bytes_sent here.
         self.network.bytes_sent = {}

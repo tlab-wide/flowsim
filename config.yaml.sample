@@ -8,15 +8,18 @@ seed: 42
 
 use_gui: false #true
 
+output_dir: 'output/nopot'
+
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
-  ConnectedVehicle: 0.1
-  PoTVehicle: 0.8
+  ConnectedVehicle: 0.99
+  PoTVehicle: 0.
   SilenceAttacker: 0.
-  SpamAttacker: 0.1
+  SpamAttacker: 0.01
   ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.
+
 
 position_manager:
   range_limit: 200 # meters
