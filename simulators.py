@@ -6,6 +6,7 @@ import abc
 
 import traci
 import math
+import time
 
 from vehicle import *
 from modules import *
@@ -23,12 +24,14 @@ class Scenario(object):
         self.init_vtp()
         self.init_rng()
 
+        self.last_time = time.time()
+
         # Create vehicle repository.
         self.vehicles: Dict[str, Vehicle] = {}
 
         # Create simulator modules.
-        self.position_manager = PositionManager(self)
-        #self.position_manager = PositionManagerV2(self)
+        #self.position_manager = PositionManager(self)
+        self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         self.perception = PerceptionSimulator(self)
         self.match = MatchSimulator(self)
@@ -38,12 +41,12 @@ class Scenario(object):
         format_dir = lambda x: os.path.join(self.output_dir, x)
 
         self.metric_collectors = {
-            'latitude': MetricCollector(format_dir('latitude.csv'), lambda: {
-                vid: v.position.x for vid, v in self.vehicles.items()
-            }, metric_type = 'vehicle'),
-            'longitude': MetricCollector(format_dir('longitude.csv'), lambda: {
-                vid: v.position.y for vid, v in self.vehicles.items()
-            }, metric_type = 'vehicle'),
+            #'latitude': MetricCollector(format_dir('latitude.csv'), lambda: {
+            #    vid: v.position.x for vid, v in self.vehicles.items()
+            #}, metric_type = 'vehicle'),
+            #'longitude': MetricCollector(format_dir('longitude.csv'), lambda: {
+            #    vid: v.position.y for vid, v in self.vehicles.items()
+            #}, metric_type = 'vehicle'),
             'recent_saw_by': MetricCollector(format_dir('recent_saw_by.csv'), self.collect_recent_saw_by),
             'bytes_sent': MetricCollector(format_dir('bytes_sent.csv'), self.collect_vehicle_sent_bytes),
         }
@@ -82,6 +85,8 @@ class Scenario(object):
         self.now = self.traci.simulation.getTime()
         self.end_time = self.traci.simulation.getEndTime()
 
+        print("Initialized sumo with end time: %s" % self.end_time)
+
     def cleanup(self):
         self.collect_final_metrics()
 
@@ -112,7 +117,6 @@ class Scenario(object):
         self.now = traci.simulation.getTime()
         if self.now >= self.end_time:
             raise StopIteration
-        print("Simulation time: %.2f" % self.now)
 
         # Update vehicle list from traci.
         for vid in self.traci.simulation.getDepartedIDList():
@@ -124,8 +128,15 @@ class Scenario(object):
                 self.set_vehicle_color(vid, (128, 128, 128, 255))
 
         for vid in self.traci.simulation.getArrivedIDList():
-            self.vehicles[vid].stop()
+            #self.vehicles[vid].stop()
             del self.vehicles[vid]
+
+        print("Wall time: %5.0f ms (%5.0f us / vehicle), simulation time: %.2f, #vehicles: %d" % (
+            (time.time() - self.last_time) * 1000,
+            (time.time() - self.last_time) * 1000 * 1000 / len(self.vehicles),
+            self.now, len(self.vehicles),
+        ))
+        self.last_time = time.time()
 
         # Give vehicles chance to thange their EIDs and let match simulator know.
         [ v.possibly_change_eid() for v in self.vehicles.values()]
@@ -211,7 +222,8 @@ class Scenario(object):
                 try:
                     numberplate = self.perception._gt_objectid_to_numberplate[objid]
                     ret[numberplate] += 1
-                except IndexError:
+                except (IndexError, KeyError):
+                    # IndexError is for gt_objectid_to_numberplate; KeyError is for ret.
                     ret[UNKNOWN_PLATE] += 1
 
         return ret

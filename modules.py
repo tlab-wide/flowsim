@@ -132,6 +132,10 @@ class PoTProver(VehicleModule):
         self._eid_to_numberplate: Dict[EID, NumberPlate] = {}
         self._numberplate_to_eid: Dict[NumberPlate, EID] = {}
 
+        # Store proofs sent in last n ticks.
+        self.send_proof_every = self.vehicle.config.get('PoTProver', {}).get('send_proof_every', 1)
+        self.recent_sent_proofs = [set() for _ in range(self.send_proof_every)]
+
     def update_matches(self):
         # Update match repository.
 
@@ -182,26 +186,27 @@ class PoTProver(VehicleModule):
             if not eid: # No match.
                 continue
 
+            if any(numberplate in i for i in self.recent_sent_proofs):
+                # Do not send duplicate proofs.
+                #print("skip duplicate proof for objid", objid)
+                continue
+
             input.proofs.append((
                 objid,
                 pot_proof(numberplate, eid, self.vehicle.eid),
             ))
 
+            # Record proofs sent in this tick.
+            self.recent_sent_proofs[-1].add(numberplate)
+
         input._objid_to_numberplate = {}
 
-        #print("%s: #known_numberplates = %d, #unmatched_eids = %d" % (
-        #    self.vehicle.numberplate,
-        #    len(self.known_numberplates),
-        #    len(self.unmatched_eids),
-        #))
-
-        #print("%s: #match = %d, #proof = %s" % (
-        #    self.vehicle.numberplate,
-        #    len(self._eid_to_numberplate),
-        #    len(input.proofs),
-        #))
-
         return input
+
+    def flush(self) -> None:
+        # Renew the recent_sent_proofs.
+        self.recent_sent_proofs = self.recent_sent_proofs[1:] + [set()]
+
 
 class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
