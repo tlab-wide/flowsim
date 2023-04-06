@@ -1,0 +1,3 @@
+[submodule "LuSTScenario"]
+	path = LuSTScenario
+	url = https://github.com/lcodeca/LuSTScenario

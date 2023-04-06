@@ -1,0 +1,23 @@
+***Starting server on port 54308 ***
+Loading net-file from 'configs/../LuSTScenario/scenario/lust.net.xml' ... done (517ms).
+Loading additional-files from 'configs/../LuSTScenario/scenario/vtypes.add.xml' ... done (1ms).
+Loading additional-files from 'configs/../LuSTScenario/scenario/busstops.add.xml' ... done (3ms).
+Loading additional-files from 'configs/../LuSTScenario/scenario/e1detectors.add.xml' ... done (21ms).
+Loading additional-files from 'configs/../LuSTScenario/scenario/lust.poly.xml' ... done (238ms).
+Loading additional-files from 'configs/../LuSTScenario/scenario/tll.static.xml' ... done (7ms).
+Loading done.
+Simulation version 1.15.0 started with time: 24000.00.
+Simulation ended at time: 24086.00
+Reason: TraCI requested termination.
+Performance: 
+ Duration: 3.63s
+ TraCI-Duration: 1.58s
+ Real time factor: 23.7176
+ UPS: 4948.428020
+Vehicles: 
+ Inserted: 394 (Loaded: 1049)
+ Running: 394
+ Waiting: 13
+
+DijkstraRouter answered 291 queries and explored 3059.93 edges on average.
+DijkstraRouter spent 0.37s answering queries (1.28ms on average).

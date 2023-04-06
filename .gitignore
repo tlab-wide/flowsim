@@ -2,5 +2,4 @@ __pycache__/
 *~
 *.swp
 config.yaml
-config/
-manhattan/data/out/
+output/
