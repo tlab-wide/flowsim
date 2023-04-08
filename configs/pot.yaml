@@ -3,7 +3,7 @@
 --- 
 
 #sumo_config_path: "manhattan/data/manhattan.sumocfg"
-sumo_config_path: "LuSTScenario/scenario/dua.static.sumocfg"
+sumo_config_path: "configs/lust.sumocfg"
 
 seed: 42
 
@@ -35,3 +35,6 @@ perception_simulator:
 vehicle:
   eid_changing_possibility: 0.0001
   pot_verifier_max_unverified_per_vehicle: 20
+  PoTProver:
+    send_proof_every: 3 # ticks
+    max_queued_proofs: 16

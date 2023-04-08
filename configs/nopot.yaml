@@ -3,12 +3,11 @@
 --- 
 
 #sumo_config_path: "manhattan/data/manhattan.sumocfg"
-#sumo_config_path: "LuSTScenario/scenario/dua.static.sumocfg"
 sumo_config_path: "configs/lust.sumocfg"
 
 seed: 42
 
-use_gui: false
+use_gui: true
 
 output_dir: 'output/lust-nopot'
 

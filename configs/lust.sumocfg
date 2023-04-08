@@ -15,9 +15,9 @@ Author: Lara CODECA [codeca@gmail.com]
     </input>
 
     <time>
-        <begin value="24000"/>
+        <begin value="0"/>
         <step-length value="1"/>
-        <end value="25000"/>
+        <end value="86400"/>
     </time>
 
     <processing>
@@ -35,7 +35,6 @@ Author: Lara CODECA [codeca@gmail.com]
 
     <report>
         <verbose value="true"/>
-        <log value="dua.static.log"/>
     </report>
 
 </configuration>
