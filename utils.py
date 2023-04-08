@@ -6,6 +6,7 @@ import os
 import sys
 import math
 import random
+import json
 import numpy as np
 import pandas
 from typing import *
@@ -34,6 +35,7 @@ class MetricCollector:
     def __init__(self, filename: str, collect_function: Callable[[], Union[GlobalMetric, VehicleMetric]], metric_type: str = None):
         self.filename = filename
         self.collect_function = collect_function
+        self.file = open(filename, 'w')
 
         # Check which type of metric is being collected.
         if metric_type is None:
@@ -46,16 +48,15 @@ class MetricCollector:
                 raise TypeError('Invalid metric type.')
         self.metric_type = metric_type
 
-        self.data = []
+        self.data = None
 
     def collect(self) -> None:
-        self.data.append(self.collect_function())
+        self.data = self.collect_function()
+        self.file.write(json.dumps(self.data) + '\n')
 
-    def save(self):
-        if self.metric_type == 'global':
-            pandas.DataFrame(self.data, columns=['value']).to_csv(self.filename, columns=['value'], index=False)
-        elif self.metric_type == 'vehicle':
-            pandas.DataFrame(self.data).to_csv(self.filename, index=False)
+    def save(self) -> None:
+        # Flush the file.
+        self.file.flush()
 
 # Define Unknown vehicle's number plate.
 UNKNOWN_PLATE = 'UNKNOWN'

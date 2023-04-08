@@ -112,7 +112,7 @@ class Scenario(object):
 
     def tick(self):
         # Run one traci step first.
-        traci.simulationStep()
+        self.traci.simulationStep()
 
         self.now = traci.simulation.getTime()
         if self.now >= self.end_time:
@@ -160,8 +160,8 @@ class Scenario(object):
         #vehicle_sent_bytes: VehicleMetric = self.collect_vehicle_sent_bytes()
         #print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
 
-        recent_saw_by = self.metric_collectors['recent_saw_by'].data[-1]
-        vehicle_sent_bytes =  self.metric_collectors['bytes_sent'].data[-1]
+        recent_saw_by = self.metric_collectors['recent_saw_by'].data
+        vehicle_sent_bytes =  self.metric_collectors['bytes_sent'].data
 
         #if not self.use_gui:
         #    print('recent_saw_by = %s' % recent_saw_by)
