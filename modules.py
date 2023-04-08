@@ -121,6 +121,11 @@ class PoTProver(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
 
+        # Initialize config.
+        self.config = self.vehicle.config.get('PoTProver', {})
+        self.max_queued_proofs = self.config.get('max_queued_proofs', 0)
+        self.send_proof_every = self.config.get('send_proof_every', 1)
+
         # Known numberplates.
         self.known_numberplates: Set[NumberPlate] = set()
 
@@ -133,8 +138,9 @@ class PoTProver(VehicleModule):
         self._numberplate_to_eid: Dict[NumberPlate, EID] = {}
 
         # Store proofs sent in last n ticks.
-        self.send_proof_every = self.vehicle.config.get('PoTProver', {}).get('send_proof_every', 1)
         self.recent_sent_proofs = [set() for _ in range(self.send_proof_every)]
+
+        self.queued_proofs: List[Tuple[int, EID]] = []
 
     def update_matches(self):
         # Update match repository.
@@ -191,13 +197,29 @@ class PoTProver(VehicleModule):
                 #print("skip duplicate proof for objid", objid)
                 continue
 
-            input.proofs.append((
-                objid,
-                pot_proof(numberplate, eid, self.vehicle.eid),
-            ))
+            proof_entry = (objid, pot_proof(numberplate, eid, self.vehicle.eid))
+
+            if len(input.proofs) >= 8:
+                # Queue excessive proofs.
+                if len(self.queued_proofs) >= self.max_queued_proofs:
+                    # Drop excessive proofs.
+                    droped_objid = self.queued_proofs.pop(0)[0]
+                    print("Warning: drop oldest queued proof for %s" % droped_objid)
+
+                print("Queued proof for %s" % objid)
+                self.queued_proofs.append(proof_entry)
+                continue
+
+            input.proofs.append(proof_entry)
 
             # Record proofs sent in this tick.
             self.recent_sent_proofs[-1].add(numberplate)
+
+        # If we have spaces for more proofs, fill them with queued proofs.
+        while len(input.proofs) < 8 and len(self.queued_proofs) > 0:
+            proof_entry = self.queued_proofs.pop(0)
+            input.proofs.append(proof_entry)
+            self.recent_sent_proofs[-1].add(proof_entry[0])
 
         input._objid_to_numberplate = {}
 
