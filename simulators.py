@@ -314,10 +314,12 @@ class PositionManagerV2(object):
         assert self.boundary[0] == (0, 0)
 
         # Create a grid of grid_x and grid_y with padding.
-        grid_x = math.ceil(self.boundary[1][0] / self.range_limit)
-        grid_y = math.ceil(self.boundary[1][1] / self.range_limit)
+        grid_x = math.ceil(self.boundary[1][0] / self.range_limit) + 2
+        grid_y = math.ceil(self.boundary[1][1] / self.range_limit) + 2
 
-        self._grid = [[set() for _ in range(grid_y + 2)] for _ in range(grid_x + 2)]
+        self._grid = [[set() for _ in range(grid_y)] for _ in range(grid_x)]
+
+        print("PositionManagerV2 initialized with boundary %s, grid size %d x %d" % (self.boundary, grid_x, grid_y))
 
     def get_vehicle_position(self, vehicle: Vehicle) -> Position:
         return self._position[vehicle]
@@ -328,6 +330,11 @@ class PositionManagerV2(object):
         # Offset by one since the grid is padded.
         grid_x = math.floor(position.x / self.range_limit) + 1
         grid_y = math.floor(position.y / self.range_limit) + 1
+
+        # Return nothing if the position is out of range.
+        # Be careful about the padding.
+        if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
+            return []
 
         # Get all vehicles in the 9 adjacent grids as candidates.
         candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
@@ -357,6 +364,12 @@ class PositionManagerV2(object):
             # Offset by one since the grid is padded.
             grid_x = math.floor(pos.x / self.range_limit) + 1
             grid_y = math.floor(pos.y / self.range_limit) + 1
+
+            # Do not count this vehicle if the position is out of range.
+            # Be careful about the padding.
+            if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
+                print('WARNING: vehicle %s is out of range: %s, yaw: %.2f theta: %.2f' % (v.numberplate, pos, yaw, theta))
+                continue
 
             self._grid[grid_x][grid_y].add(v)
 
