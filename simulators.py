@@ -33,8 +33,8 @@ class Scenario(object):
         #self.position_manager = PositionManager(self)
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
-        #self.perception = PerceptionSimulator(self)
-        self.perception = PerceptionSimulatorV2(self)
+        self.perception = PerceptionSimulator(self)
+        #self.perception = PerceptionSimulatorV2(self)
         self.match = MatchSimulator(self)
 
         # Create metric collectors.
@@ -309,6 +309,8 @@ class PositionManagerV2(object):
         self.config = scenario.config['position_manager']
         self.range_limit = self.config['range_limit']
 
+        self.subscribed = set()
+
         grid_size = self.range_limit
 
         self.boundary = self.traci.simulation.getNetBoundary()
@@ -350,13 +352,25 @@ class PositionManagerV2(object):
         self._position = {}
 
         for numberplate, v in self.vehicles.items():
-            x, y = self.traci.vehicle.getPosition(numberplate)
-            yaw  = self.traci.vehicle.getAngle(numberplate)
+            # Subscribe to the vehicle if not already subscribed.
+            if numberplate not in self.subscribed:
+                self.traci.vehicle.subscribe(numberplate, [traci.constants.VAR_POSITION, traci.constants.VAR_ANGLE])
+                self.subscribed.add(numberplate)
+
+        result = self.traci.vehicle.getAllSubscriptionResults()
+
+        for numberplate, v in self.vehicles.items():
+            #x, y = self.traci.vehicle.getPosition(numberplate)
+            #yaw  = self.traci.vehicle.getAngle(numberplate)
+            x, y = result[numberplate][traci.constants.VAR_POSITION]
+            yaw  = result[numberplate][traci.constants.VAR_ANGLE]
 
             # Warning: getAngle returns yaw (0 for North, 90 for East, etc.)
             # Need to convert it to theta (0 for East, 90 for North, etc.)
             theta = (360 + 90 - yaw) % 360
             self._position[v] = Position(x, y, theta)
+
+        # TODO: Do we need to unsubscribe vehicles that are no longer in the simulation?
 
         # Recreate grid.
         self._grid = [[set() for _ in range(len(self._grid[0]))] for _ in range(len(self._grid))]
