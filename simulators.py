@@ -33,8 +33,8 @@ class Scenario(object):
         #self.position_manager = PositionManager(self)
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
-        self.perception = PerceptionSimulator(self)
-        #self.perception = PerceptionSimulatorV2(self)
+        #self.perception = PerceptionSimulator(self)
+        self.perception = PerceptionSimulatorV2(self)
         self.match = MatchSimulator(self)
 
         # Create metric collectors.
@@ -372,6 +372,10 @@ class PositionManagerV2(object):
 
         # TODO: Do we need to unsubscribe vehicles that are no longer in the simulation?
 
+        # Update the grid.
+        self._update_grid()
+
+    def _update_grid(self):
         # Recreate grid.
         self._grid = [[set() for _ in range(len(self._grid[0]))] for _ in range(len(self._grid))]
 
