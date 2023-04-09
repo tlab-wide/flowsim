@@ -33,7 +33,8 @@ class Scenario(object):
         #self.position_manager = PositionManager(self)
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
-        self.perception = PerceptionSimulator(self)
+        #self.perception = PerceptionSimulator(self)
+        self.perception = PerceptionSimulatorV2(self)
         self.match = MatchSimulator(self)
 
         # Create metric collectors.
@@ -41,14 +42,14 @@ class Scenario(object):
         format_dir = lambda x: os.path.join(self.output_dir, x)
 
         self.metric_collectors = {
-            #'latitude': MetricCollector(format_dir('latitude.csv'), lambda: {
-            #    vid: v.position.x for vid, v in self.vehicles.items()
-            #}, metric_type = 'vehicle'),
-            #'longitude': MetricCollector(format_dir('longitude.csv'), lambda: {
-            #    vid: v.position.y for vid, v in self.vehicles.items()
-            #}, metric_type = 'vehicle'),
-            'recent_saw_by': MetricCollector(format_dir('recent_saw_by.csv'), self.collect_recent_saw_by),
-            'bytes_sent': MetricCollector(format_dir('bytes_sent.csv'), self.collect_vehicle_sent_bytes),
+            'latitude': MetricCollector(format_dir('latitude.json'), lambda: {
+                vid: v.position.x for vid, v in self.vehicles.items()
+            }, metric_type = 'vehicle'),
+            'longitude': MetricCollector(format_dir('longitude.json'), lambda: {
+                vid: v.position.y for vid, v in self.vehicles.items()
+            }, metric_type = 'vehicle'),
+            'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
+            'bytes_sent': MetricCollector(format_dir('bytes_sent.json'), self.collect_vehicle_sent_bytes),
         }
 
         atexit.register(self.cleanup)
@@ -368,7 +369,7 @@ class PositionManagerV2(object):
             # Do not count this vehicle if the position is out of range.
             # Be careful about the padding.
             if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
-                print('WARNING: vehicle %s is out of range: %s, yaw: %.2f theta: %.2f' % (v.numberplate, pos, yaw, theta))
+                #print('WARNING: vehicle %s is out of range: %s, yaw: %.2f theta: %.2f' % (v.numberplate, pos, yaw, theta))
                 continue
 
             self._grid[grid_x][grid_y].add(v)
@@ -464,6 +465,69 @@ class PerceptionSimulator(object):
                     v.position,
                     v.numberplate,
                 ))
+
+        return ret
+
+class PerceptionSimulatorV2(object):
+    ''' A more realistic perception simulator. '''
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
+        self.vehicles = scenario.vehicles
+        self.random = random_from(scenario.random)
+        self.config = scenario.config['perception_simulator']
+        self.vision_distance = self.config['vision_distance']
+        self.vision_angle = abs(self.config['vision_angle'])
+
+        self.position_manager = scenario.position_manager
+
+        # Ground truth.
+        # Note that one numberplate can have multiple object ids.
+        # This happens when a vehicle changes its EID.
+        self._gt_eid_to_objectid: Dict[EID, int] = {}
+        self._gt_objectid_to_eid: List[EID] = []
+        self._gt_objectid_to_numberplate: List[NumberPlate] = []
+
+    def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
+        # Return all perceived objects and their positions of the given egovehicle.
+        candidates = self.position_manager.get_nearby_vehicles(ego.position)
+        dict_numberplate_to_candidate_index = {v.numberplate: i for i, v in enumerate(candidates)}
+        line_candidates = []
+
+        for v in candidates:
+            if v == ego: continue  # Don't count self.
+
+            distance, angle = (v.position - ego.position).to_polar()
+            # Do not use > here since it may be nan.
+            if (
+                    distance < self.vision_distance and
+                    abs(ego.position.heading - angle) < self.vision_angle
+            ):
+                line_candidates.extend(v.get_lines())
+
+        line_candidates = sorted(line_candidates, key=lambda x: min(ego.position.distance_to(x.a), ego.position.distance_to(x.b)))
+        node = Node()
+
+        for l in line_candidates:
+            node.update(ego.position, data=l)
+
+        line_visible = node.get_lines()
+        ret = []
+
+        for l in line_visible:
+            v = candidates[dict_numberplate_to_candidate_index[l.numberplate]]
+
+            # Record the ground truth if not already.
+            # Object ID will be automatically assigned.
+            if v.eid not in self._gt_eid_to_objectid:
+                self._gt_eid_to_objectid[v.eid] = len(self._gt_objectid_to_eid)
+                self._gt_objectid_to_eid.append(v.eid)
+                self._gt_objectid_to_numberplate.append(v.numberplate)
+
+            ret.append((
+                self._gt_eid_to_objectid[v.eid],
+                v.position,
+                v.numberplate,
+            ))
 
         return ret
 
