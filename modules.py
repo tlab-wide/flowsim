@@ -31,6 +31,9 @@ class LocalPerception(VehicleModule):
         assert input == None, f"Module {self.__class__.__name__} requires no input."
 
         new_objects = self.vehicle.scenario.perception.perceive(self.vehicle)
+        
+        #if new_objects: 
+        #    print("[%s] Objects: %s" % (self.vehicle.numberplate, new_objects))
 
         if len(new_objects) > 128:
             # TODO: we need a queue.
@@ -142,6 +145,9 @@ class PoTProver(VehicleModule):
 
         self.queued_proofs: List[Tuple[int, EID]] = []
 
+        self.n_enqueued_proofs: int = 0
+        self.n_dropped_proofs: int = 0
+
     def update_matches(self):
         # Update match repository.
 
@@ -204,10 +210,12 @@ class PoTProver(VehicleModule):
                 if len(self.queued_proofs) >= self.max_queued_proofs:
                     # Drop excessive proofs.
                     droped_objid = self.queued_proofs.pop(0)[0]
-                    print("Warning: drop oldest queued proof for %s" % droped_objid)
+                    self.n_dropped_proofs += 1
+                    print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate)
 
-                print("Queued proof for %s" % objid)
+                print("[%s] queue proof for %s" % (self.vehicle.numberplate, numberplate))
                 self.queued_proofs.append(proof_entry)
+                self.n_enqueued_proofs += 1
                 continue
 
             input.proofs.append(proof_entry)
@@ -242,6 +250,12 @@ class PoTVerifier(VehicleModule):
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
+        objid_to_pubkey = self.update_provers(input)
+        self.stage_objects(input, objid_to_pubkey)
+        return self.generate_cpm(input, objid_to_pubkey)
+
+
+    def update_provers(self, input: CPM) -> None:
         # Generate pubkey from proofs and store them.
         # TODO: limit the number of unmatched proofs per sender.
         objid_to_pubkey: Dict[int, Pubkey] = {}
@@ -258,13 +272,16 @@ class PoTVerifier(VehicleModule):
                 self.pubkey_to_provers[pubkey] = set()
             
             self.pubkey_to_provers[pubkey].add(input.sender)
+        return objid_to_pubkey
 
+    def stage_objects(self, input: CPM, objid_to_pubkey: Dict[int, Pubkey]) -> None:
         # Stage objects.
         for oid, pos in input.perceived_objects:
             # Only stage objects with valid proof.
             if oid in objid_to_pubkey:
                 self._unconfirmed_objects[oid] = pos
 
+    def generate_cpm(self, input: CPM, objid_to_pubkey: Dict[int, Pubkey]) -> CPM:
         # Filter confirmed and unconfirmed objects.
         confirmed = []
         unconfirmed = []
@@ -272,6 +289,7 @@ class PoTVerifier(VehicleModule):
         for oid, pos in self._unconfirmed_objects.items():
             # The Object didn't come with a proof, ignore.
             if oid not in objid_to_pubkey:
+                #print("[%s] Warning: dropped object without proof, sender: %s" % (self.vehicle.numberplate, input.sender))
                 unconfirmed.append((oid, pos))
                 continue
 
@@ -282,13 +300,6 @@ class PoTVerifier(VehicleModule):
                 continue
 
             confirmed.append((oid, pos))
-
-        #print("%s: #total = %d, #confirmed = %d, #still_unconfirmed = %d" % (
-        #    self.vehicle.numberplate,
-        #    len(self._unconfirmed_objects),
-        #    len(confirmed),
-        #    len(unconfirmed),
-        #))
 
         self._unconfirmed_objects = dict(unconfirmed)
 

@@ -50,6 +50,8 @@ class Scenario(object):
             }, metric_type = 'vehicle'),
             'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
             'bytes_sent': MetricCollector(format_dir('bytes_sent.json'), self.collect_vehicle_sent_bytes),
+            'enqueued_proofs': MetricCollector(format_dir('enqueued_proofs.json'), self.collect_enqueued_proofs),
+            'dropped_proofs': MetricCollector(format_dir('dropped_proofs.json'), self.collect_dropped_proofs),
         }
 
         atexit.register(self.cleanup)
@@ -198,36 +200,72 @@ class Scenario(object):
 
         return ret
 
+    def collect_enqueued_proofs(self) -> VehicleMetric:
+        # Collect how many proofs a vehicle enqueued in this tick.
+        ret = {}
+
+        for v in self.vehicles.values():
+            module = v.get_module(PoTProver)
+            if not module:
+                continue
+            ret[v.numberplate] = module.n_enqueued_proofs
+
+            # XXX: reset n_enqueued_proofs here.
+            module.n_enqueued_proofs = 0
+
+        return ret
+
+    def collect_dropped_proofs(self) -> VehicleMetric:
+        # Collect how many proofs a vehicle dropped in this tick.
+        ret = {}
+
+        for v in self.vehicles.values():
+            module = v.get_module(PoTProver)
+            if not module:
+                continue
+            ret[v.numberplate] = module.n_dropped_proofs
+
+            # XXX: reset n_dropped_proofs here.
+            module.n_dropped_proofs = 0
+
+        return ret
+
     def collect_prover_matches(self) -> VehicleMetric:
         # Collect how many match entries of a given prover.
 
-        ret = dict((id, 0) for id in self.vehicles.keys())
+        ret = {}
 
         for v in self.vehicles.values():
             module = v.get_module(Prover)
-            ret[v.numberplate] = module and len(module._numberplate_to_eid)
+            if not module:
+                continue
+            ret[v.numberplate] = len(module._numberplate_to_eid)
 
         return ret
 
     def collect_prover_unmatched_eids(self) -> VehicleMetric:
         # Collect how many unmatched eids of a given prover.
 
-        ret = dict((id, 0) for id in self.vehicles.keys())
+        ret = {}
 
         for v in self.vehicles.values():
             module = v.get_module(Prover)
-            ret[v.numberplate] = module and len(module.unmatched_eids)
+            if not module:
+                continue
+            ret[v.numberplate] = len(module.unmatched_eids)
 
         return ret
 
     def collect_prover_known_numberplates(self) -> VehicleMetric:
         # Collect how many known numberplates of a given prover.
 
-        ret = dict((id, 0) for id in self.vehicles.keys())
+        ret = {}
 
         for v in self.vehicles.values():
             module = v.get_module(Prover)
-            ret[v.numberplate] = module and len(module.known_numberplates)
+            if not module:
+                continue
+            ret[v.numberplate] = len(module.known_numberplates)
 
         return ret
 
