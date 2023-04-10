@@ -39,5 +39,5 @@ vehicle:
   eid_changing_possibility: 0.0001
   pot_verifier_max_unverified_per_vehicle: 20
   PoTProver:
-    send_proof_every: 3 # ticks
-    max_queued_proofs: 16
+    #send_proof_every: 1 # ticks
+    max_queued_proofs: 24

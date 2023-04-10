@@ -40,4 +40,4 @@ vehicle:
   pot_verifier_max_unverified_per_vehicle: 20
   PoTProver:
     send_proof_every: 3 # ticks
-    max_queued_proofs: 16
+    max_queued_proofs: 24
