@@ -125,9 +125,6 @@ class Scenario(object):
                 self.vehicles[vid] = self.generate_vehicle(vid)
                 #print("New %s: %s" % (self.vehicles[vid].__class__.__name__, vid))
 
-                # Set default color.
-                self.set_vehicle_color(vid, (128, 128, 128, 255))
-
         for vid in self.traci.simulation.getArrivedIDList():
             #self.vehicles[vid].stop()
             del self.vehicles[vid]
@@ -153,35 +150,7 @@ class Scenario(object):
 
     def collect_metrics(self):
         # Collect metrics from all vehicles.
-
         [i.collect() for i in self.metric_collectors.values()]
-
-        #recent_saw_by: VehicleMetric = self.collect_recent_saw_by()
-
-        #vehicle_sent_bytes: VehicleMetric = self.collect_vehicle_sent_bytes()
-        #print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
-
-        recent_saw_by = self.metric_collectors['recent_saw_by'].data
-        vehicle_sent_bytes =  self.metric_collectors['bytes_sent'].data
-
-        #if not self.use_gui:
-        #    print('recent_saw_by = %s' % recent_saw_by)
-        #    print('vehicle_sent_bytes = %s' % vehicle_sent_bytes)
-
-        def _normalize_color(n, max_ = 10, min_ = 0) -> int:
-            # Normalize and clip a number to 0-255.
-            ret = int(255. * (n - min_) / (max_ - min_))
-            return min(max(ret, 0), 255)
-
-        for vid in self.vehicles.keys():
-            # Set color according to metrics.
-
-            r = _normalize_color(recent_saw_by[vid], max_=10)
-            g = 0
-            b = 0
-
-            self.set_vehicle_color(vid, (r, g, b, 255))
-
 
     def collect_final_metrics(self):
         # Collect final metrics from all vehicles.
