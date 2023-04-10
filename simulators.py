@@ -322,6 +322,9 @@ class PositionManagerV2(object):
 
         self._grid = [[set() for _ in range(grid_y)] for _ in range(grid_x)]
 
+        # Cache results to speed up get_nearby_vehicles.
+        self.result_cache = {}
+
         print("PositionManagerV2 initialized with boundary %s, grid size %d x %d" % (self.boundary, grid_x, grid_y))
 
     def get_vehicle_position(self, vehicle: Vehicle) -> Position:
@@ -329,6 +332,9 @@ class PositionManagerV2(object):
 
     def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
         # Get nearby vehicles from given position.
+
+        if position in self.result_cache:
+            return self.result_cache[position]
 
         # Offset by one since the grid is padded.
         grid_x = math.floor(position.x / self.range_limit) + 1
@@ -350,6 +356,9 @@ class PositionManagerV2(object):
     def update_all_position(self):
         # Set vehicles' positions to the data at the given tick.
         self._position = {}
+
+        # Invalidate cache.
+        self.result_cache = {}
 
         for numberplate, v in self.vehicles.items():
             # Subscribe to the vehicle if not already subscribed.
@@ -412,6 +421,7 @@ class NetworkSimulator(object):
 
     def broadcast(self, sender: Vehicle, message: object) -> int:
         # Broadcast a message to vehicles in range and return number of receipents.
+        #print("[%s] Broadcasting message %s" % (sender.numberplate, message))
 
         # Accumulate number of bytes sent.
         self.bytes_sent[sender] = self.bytes_sent.get(sender, 0) + len(message)
