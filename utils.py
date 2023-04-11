@@ -88,10 +88,13 @@ class Position(object):
         )
 
     def angle_to(self, other: Position) -> float:
-        return (other - self).to_polar()[1]
+        return (math.atan2(other.y - self.y, other.x - self.x) / math.pi * 180 + 360) % 360
+        #return (other - self).to_polar()[1]
+
 
     def distance_to(self, other: Position) -> float:
-        return (self - other).to_polar()[0]
+        return math.hypot(other.x - self.x, other.y - self.y)
+        #return (other - self).to_polar()[0]
 
 
     def __hash__(self: Position):
@@ -187,30 +190,33 @@ class Node:
         self.__update_rightmost(angle_end)
 
     def update(self, eye: Position, data: Line = None, angle_start: float = 0.0, angle_end: float = 360.0):
-        if data is not None:
-            angle_start = eye.angle_to(data.a)
-            angle_end = eye.angle_to(data.b)
+        if data is None:
+            return
 
-            if angle_start > angle_end:
-                angle_end, angle_start = angle_start, angle_end
+        if self.left is not None or self.right is not None:
+            self.left.update(eye, data)
+            self.right.update(eye, data)
+            return
 
-            # cross x axis (atan2 == 0)
-            if angle_end - angle_start > 180.0 and self.__available(angle_start, angle_end):
-                self.__update_edge(data, angle_start, angle_end)
-                return
+        angle_start = eye.angle_to(data.a)
+        angle_end = eye.angle_to(data.b)
 
-            if self.left is None and self.right is None:
-                if self.angle_start <= angle_start < angle_end <= self.angle_end:
-                    self.data = data
-                    self.left = Node(self.angle_start, angle_start)
-                    self.right = Node(angle_end, self.angle_end)
-                elif self.angle_start < angle_start < self.angle_end:
-                    self.angle_end = angle_start
-                elif self.angle_end > angle_end > self.angle_start:
-                    self.angle_start = angle_end
-            else:
-                self.left.update(eye, data)
-                self.right.update(eye, data)
+        if angle_start > angle_end:
+            angle_end, angle_start = angle_start, angle_end
+
+        # cross x axis (atan2 == 0)
+        if angle_end - angle_start > 180.0 and self.__available(angle_start, angle_end):
+            self.__update_edge(data, angle_start, angle_end)
+            return
+
+        if self.angle_start <= angle_start < angle_end <= self.angle_end:
+            self.data = data
+            self.left = Node(self.angle_start, angle_start)
+            self.right = Node(angle_end, self.angle_end)
+        elif self.angle_start < angle_start < self.angle_end:
+            self.angle_end = angle_start
+        elif self.angle_end > angle_end > self.angle_start:
+            self.angle_start = angle_end
 
 
 @dataclasses.dataclass
