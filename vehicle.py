@@ -83,29 +83,24 @@ class Vehicle(object):
 
         rad = math.radians(heading)
 
-        dlx = length / 2 * math.cos(rad)
-        dly = length / 2 * math.sin(rad)
+        d2lx = length * math.cos(rad)
+        d2ly = length * math.sin(rad)
         dwx = width / 2 * math.cos(rad)
         dwy = width / 2 * math.sin(rad)
 
         # FR, FL, BR, BL
         positions = [
-            Position(px + dlx + dwx, py + dly - dwy),
-            Position(px + dlx - dwx, py + dly + dwy),
-            Position(px - dlx + dwx, py - dly - dwy),
-            Position(px - dlx - dwx, py - dly + dwy)
+            Position(px + dwx, py - dwy),
+            Position(px - dwx, py + dwy),
+            Position(px - d2lx + dwx, py - d2ly - dwy),
+            Position(px - d2lx - dwx, py - d2ly + dwy)
         ]
         diagonal1 = Line(positions[0], positions[3])
         diagonal2 = Line(positions[1], positions[2])
         plate1 = Line(positions[0], positions[1], self.numberplate).get_subline(percent_plate)
         plate2 = Line(positions[2], positions[3], self.numberplate).get_subline(percent_plate)
 
-        return [
-            diagonal1,
-            diagonal2,
-            plate1,
-            plate2
-        ]
+        return (diagonal1, diagonal2, plate1, plate2)
 
     def change_eid(self):
         self.eid = '%064x' % (self.random.randint(0, 2**256 - 1))

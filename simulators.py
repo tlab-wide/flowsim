@@ -532,16 +532,18 @@ class PerceptionSimulatorV2(object):
         for v in candidates:
             if v == ego: continue  # Don't count self.
 
-            distance, angle = (v.position - ego.position).to_polar()
+            distance = ego.position.distance_to(v.position)
             # Do not use > here since it may be nan.
-            if (
-                    distance < self.vision_distance and
-                    abs(ego.position.heading - angle) < self.vision_angle
-            ):
-                line_candidates.extend(v.get_lines())
+            if distance < self.vision_distance:
+                (d1, d2, p1, p2) = v.get_lines()
+
+                f = lambda line: min(line.a.distance_to(ego.position), line.b.distance_to(ego.position))
+
+                line_candidates.append(d1 if f(d1) < f(d2) else d2)
+                line_candidates.append(p1 if f(p1) < f(p2) else p2)
 
         line_candidates = sorted(line_candidates, key=lambda x: min(ego.position.distance_to(x.a), ego.position.distance_to(x.b)))
-        node = Node()
+        node = Node(angle_start=90.0 - self.vision_angle, angle_end=90.0 + self.vision_angle)
 
         for l in line_candidates:
             node.update(ego.position, data=l)
@@ -564,9 +566,10 @@ class PerceptionSimulatorV2(object):
                 v.position,
                 v.numberplate,
             ))
+        
+        if ret:
+            print("[%s] objects: %s" % (ego.numberplate, ret))
 
-        #if ret:
-        #    print("[%s] objects: %s" % (ego.numberplate, ret))
         return ret
 
 class MatchSimulator(object):
