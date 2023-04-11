@@ -357,6 +357,7 @@ class PositionManagerV2(object):
 
         # Filter out vehicles > range_limit away.
         ret = [ v for v in candidates if (self._position[v] - position).to_polar()[0] < self.range_limit ]
+        self.result_cache[position] = ret
 
         return ret
 
@@ -564,6 +565,8 @@ class PerceptionSimulatorV2(object):
                 v.numberplate,
             ))
 
+        #if ret:
+        #    print("[%s] objects: %s" % (ego.numberplate, ret))
         return ret
 
 class MatchSimulator(object):
