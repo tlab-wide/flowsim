@@ -24,8 +24,6 @@ class Scenario(object):
         self.init_vtp()
         self.init_rng()
 
-        self.last_time = time.time()
-
         # Create vehicle repository.
         self.vehicles: Dict[str, Vehicle] = {}
 
@@ -114,6 +112,9 @@ class Scenario(object):
         return ret
 
     def tick(self):
+
+        t0 = time.time()
+
         # Run one traci step first.
         self.traci.simulationStep()
 
@@ -138,22 +139,31 @@ class Scenario(object):
         # Let position manager to update vehicles' position and update to all vehicles.
         self.position_manager.update_all_position()
         [v.update_position() for v in self.vehicles.values()]
+
+        t3 = time.time()
         
         # Do a tick for every running vehicles.
         for v in self.vehicles.values():
             v.do_work()
 
+        t4 = time.time()
+
         # Collect metrics from all vehicles.
         [i.collect() for i in self.metric_collectors.values()]
 
-        # Print out some statistics.
-        print("Wall time: %5.0f ms (%5.0f us / vehicle), simulation time: %.2f, #vehicles: %d" % (
-            (time.time() - self.last_time) * 1000,
-            (time.time() - self.last_time) * 1000 * 1000 / len(self.vehicles),
-            self.now, len(self.vehicles),
-        ))
+        t5 = time.time()
 
-        self.last_time = time.time()
+        # Print out some statistics.
+        format_time = lambda dt: "%3.0f ms(%3.0f us)" % (dt * 1000, dt * 1000 * 1000 / len(self.vehicles))
+
+        print("step: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
+            format_time(t3 - t0),
+            format_time(t4 - t3),
+            format_time(t5 - t4),
+            format_time(t5 - t0),
+            self.now,
+            len(self.vehicles),
+        ))
 
     def collect_final_metrics(self):
         # Collect final metrics from all vehicles.
