@@ -8,7 +8,6 @@ import math
 import random
 import json
 import numpy as np
-import pandas
 from typing import *
 
 if 'SUMO_HOME' in os.environ:

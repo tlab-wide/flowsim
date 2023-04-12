@@ -1,1 +1,3 @@
 pyyaml
+traci=0.15.0
+numpy
