@@ -543,8 +543,11 @@ class PerceptionSimulatorV2(object):
                 line_candidates.append(d1 if f(d1) < f(d2) else d2)
                 line_candidates.append(p1 if f(p1) < f(p2) else p2)
 
+        angle_start = ego.position.heading - self.vision_angle
+        angle_end = ego.position.heading + self.vision_angle
+
         line_candidates = sorted(line_candidates, key=lambda x: min(ego.position.distance_to(x.a), ego.position.distance_to(x.b)))
-        node = Node(angle_start=90.0 - self.vision_angle, angle_end=90.0 + self.vision_angle)
+        node = Node(angle_start, angle_end)
 
         for l in line_candidates:
             node.update(ego.position, data=l)

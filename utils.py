@@ -143,6 +143,13 @@ class Node:
         self.left = left
         self.right = right
 
+        if self.angle_start < 0.0:
+            self.left = Node(angle_end=self.angle_end)
+            self.right = Node(angle_start=self.angle_start + 360.0)
+        elif self.angle_end > 360.0:
+            self.left = Node(angle_end=self.angle_end - 360.0)
+            self.right = Node(angle_start=self.angle_start)
+
     def get_lines(self) -> set[Line]:
         lines = []
         stack = []
@@ -189,13 +196,8 @@ class Node:
         self.__update_leftmost(data, angle_start)
         self.__update_rightmost(angle_end)
 
-    def update(self, eye: Position, data: Line = None, angle_start: float = 0.0, angle_end: float = 360.0):
+    def update(self, eye: Position, data: Line, angle_start: float = 0.0, angle_end: float = 360.0):
         if data is None:
-            return
-
-        if self.left is not None or self.right is not None:
-            self.left.update(eye, data)
-            self.right.update(eye, data)
             return
 
         angle_start = eye.angle_to(data.a)
@@ -204,19 +206,31 @@ class Node:
         if angle_start > angle_end:
             angle_end, angle_start = angle_start, angle_end
 
-        # cross x axis (atan2 == 0)
-        if angle_end - angle_start > 180.0 and self.__available(angle_start, angle_end):
-            self.__update_edge(data, angle_start, angle_end)
-            return
+        angle_cross_x = angle_end - angle_start > 180.0
 
-        if self.angle_start <= angle_start < angle_end <= self.angle_end:
-            self.data = data
-            self.left = Node(self.angle_start, angle_start)
-            self.right = Node(angle_end, self.angle_end)
-        elif self.angle_start < angle_start < self.angle_end:
-            self.angle_end = angle_start
-        elif self.angle_end > angle_end > self.angle_start:
-            self.angle_start = angle_end
+        stack = [self]
+        while stack:
+            node = stack.pop()
+
+            if node.left is not None or node.right is not None:
+                stack.append(node.right)
+                stack.append(node.left)
+                continue
+
+            # cross x axis (atan2 == 0)
+            if angle_cross_x and node.__available(angle_start, angle_end):
+                node.__update_edge(data, angle_start, angle_end)
+                return
+
+            if node.angle_start <= angle_start < angle_end <= node.angle_end:
+                node.data = data
+                node.left = Node(node.angle_start, angle_start)
+                node.right = Node(angle_end, node.angle_end)
+                return
+            elif node.angle_start < angle_start < node.angle_end:
+                node.angle_end = angle_start
+            elif node.angle_end > angle_end > node.angle_start:
+                node.angle_start = angle_end
 
 
 @dataclasses.dataclass
