@@ -270,13 +270,15 @@ class CPM(object):
         assert self.sender == other.sender
         assert self._objid_to_numberplate == other._objid_to_numberplate == {}
 
-        # Result is considered fake if any of the two is fake.
+        assert set(self.perceived_objects) & set(other.perceived_objects) == set()
+        assert set(self.proofs) & set(other.proofs) == set()
 
         return CPM(
             sender = self.sender,
             perceived_objects = self.perceived_objects + other.perceived_objects,
             proofs = self.proofs + other.proofs,
             _objid_to_numberplate = {},
+            # Result is considered fake if any of the two is fake.
             _gt_is_fake = self._gt_is_fake or other._gt_is_fake,
         )
 

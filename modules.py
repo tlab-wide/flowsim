@@ -91,13 +91,11 @@ class CPSSender(VehicleModule):
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
-        cpm = copy.copy(input)
-
         # Canonicalize the CPM.
-        cpm.sender = self.vehicle.eid
-        cpm._objid_to_numberplate = {}
+        input.sender = self.vehicle.eid
+        input._objid_to_numberplate = {}
 
-        self.cpms_to_send.append(cpm)
+        self.cpms_to_send.append(input)
 
         return None
 
@@ -162,35 +160,8 @@ class PoTProver(VehicleModule):
             self._eid_to_numberplate[e] = n
             self._numberplate_to_eid[n] = e
 
-    def do_work(self, input: CPM) -> CPM:
-        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
-
-        # Notice modules runs after change_eid(),
-        # so the ego's EID is consistent among modules,
-        # and can be used for detemine source of CPM.
-        if input.sender != self.vehicle.eid:
-            # Received a CPM from another vehicle.
-            # We only need to collect its EID.
-
-            self.unmatched_eids.add(input.sender)
-
-            self.update_matches()
-
-            return None
-
-        # Received a CPM from LocalPerception.
-
-        # Record numberplates from perceived objects.
-        self.known_numberplates |= set(input._objid_to_numberplate.values())
-
-        # Match!
-        self.update_matches()
-
-        # Generate proofs for all matched vehicles.
-
-        # TODO: queue excessive proofs.
-        assert input.proofs == []
-
+    def generate_proofs(self, input: CPM) -> CPM:
+        # Generate proofs for all matched vehicles in the given CPM.
         for objid, pos in input.perceived_objects:
             numberplate = input._objid_to_numberplate[objid]
             eid = self._numberplate_to_eid.get(numberplate, None)
@@ -232,6 +203,33 @@ class PoTProver(VehicleModule):
         input._objid_to_numberplate = {}
 
         return input
+
+    def do_work(self, input: CPM) -> CPM:
+        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
+
+        # Notice that modules runs after change_eid(),
+        # so the ego's EID is consistent among modules,
+        # and can be used for determine source of CPM.
+        if input.sender != self.vehicle.eid:
+            # Received a CPM from another vehicle.
+            # We only need to collect its EID.
+
+            self.unmatched_eids.add(input.sender)
+
+            self.update_matches()
+
+            return None
+
+        # Received a CPM from LocalPerception.
+
+        # Record numberplates from perceived objects.
+        self.known_numberplates |= set(input._objid_to_numberplate.values())
+
+        # Match!
+        self.update_matches()
+
+        return self.generate_proofs(input)
+
 
     def flush(self) -> None:
         # Renew the recent_sent_proofs.
