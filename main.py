@@ -16,7 +16,6 @@ def main():
     while True:
         try:
             scenario.tick()
-            scenario.collect_metrics()
         except StopIteration:
             break
 

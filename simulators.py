@@ -131,13 +131,6 @@ class Scenario(object):
             #self.vehicles[vid].stop()
             del self.vehicles[vid]
 
-        print("Wall time: %5.0f ms (%5.0f us / vehicle), simulation time: %.2f, #vehicles: %d" % (
-            (time.time() - self.last_time) * 1000,
-            (time.time() - self.last_time) * 1000 * 1000 / len(self.vehicles),
-            self.now, len(self.vehicles),
-        ))
-        self.last_time = time.time()
-
         # Give vehicles chance to thange their EIDs and let match simulator know.
         [ v.possibly_change_eid() for v in self.vehicles.values()]
         self.match.update_eids()
@@ -150,9 +143,17 @@ class Scenario(object):
         for v in self.vehicles.values():
             v.do_work()
 
-    def collect_metrics(self):
         # Collect metrics from all vehicles.
         [i.collect() for i in self.metric_collectors.values()]
+
+        # Print out some statistics.
+        print("Wall time: %5.0f ms (%5.0f us / vehicle), simulation time: %.2f, #vehicles: %d" % (
+            (time.time() - self.last_time) * 1000,
+            (time.time() - self.last_time) * 1000 * 1000 / len(self.vehicles),
+            self.now, len(self.vehicles),
+        ))
+
+        self.last_time = time.time()
 
     def collect_final_metrics(self):
         # Collect final metrics from all vehicles.
@@ -568,7 +569,8 @@ class PerceptionSimulatorV2(object):
             ))
         
         if ret:
-            print("[%s] objects: %s" % (ego.numberplate, ret))
+            #print("[%s] objects: %s" % (ego.numberplate, ret))
+            pass
 
         return ret
 
