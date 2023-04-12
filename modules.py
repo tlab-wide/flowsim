@@ -204,6 +204,23 @@ class PoTProver(VehicleModule):
 
         return input
 
+    def hear(self, e: EID) -> None:
+        # Hear from a vehicle.
+
+        # If the sender is matched, do nothing.
+        if e in self._eid_to_numberplate:
+            return
+
+        # Try match it against known numberplates.
+        n = self.vehicle.scenario.match.match_eid(self.known_numberplates, e)
+
+        if n:
+            self._eid_to_numberplate[e] = n
+            self._numberplate_to_eid[n] = e
+        else:
+            # Only keep unmatched EIDs.
+            self.unmatched_eids.add(e)
+
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
@@ -213,12 +230,7 @@ class PoTProver(VehicleModule):
         if input.sender != self.vehicle.eid:
             # Received a CPM from another vehicle.
             # We only need to collect its EID.
-
-            self.unmatched_eids.add(input.sender)
-
-            self.update_matches()
-
-            return None
+            return self.hear(input.sender)
 
         # Received a CPM from LocalPerception.
 
