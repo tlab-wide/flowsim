@@ -295,3 +295,23 @@ def pot_pubkey(proof: Proof, salt: EID) -> Pubkey:
 
     return f"{eid}#{plate}".encode()
 
+class RingBuffer:
+    # A fixed-size ring buffer.
+    def __init__(self, size: int, default_factory: Callable[[], Any] = lambda: None):
+        self.size = size
+        self.default_factory = default_factory
+        self.data = [default_factory() for _ in range(size)]
+
+    @property
+    def current(self):
+        return self.data[0]
+
+    @current.setter
+    def current(self, value: Any):
+        self.data[0] = value
+
+    def advance(self, new_data: Any = None):
+        if new_data == None:
+            new_data = self.default_factory()
+        self.data = [new_data] + self.data[:-1]
+

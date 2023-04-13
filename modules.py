@@ -51,22 +51,22 @@ class Planner(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
 
-        self.recent_seen_objects = [set() for _ in range(10)]
+        self.recent_seen_objects = RingBuffer(10, lambda: set())
 
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
         for objid, pos in input.perceived_objects:
-            self.recent_seen_objects[0].add(objid)
+            self.recent_seen_objects.current.add(objid)
 
         return None
 
     def recent_seen_objids(self) -> Set[int]:
-        return functools.reduce(lambda x, y: x.union(y), self.recent_seen_objects, set())
+        return functools.reduce(lambda x, y: x.union(y), self.recent_seen_objects.data, set())
 
     def flush(self) -> None:
         # Renew the recent_seen_objects.
-        self.recent_seen_objects = self.recent_seen_objects[1:] + [set()]
+        self.recent_seen_objects.advance()
 
 class CPSReceiver(VehicleModule):
     def do_work(self, input: None) -> List[CPM]:
@@ -131,7 +131,7 @@ class PoTProver(VehicleModule):
         self._numberplate_to_eid: Dict[NumberPlate, EID] = {}
 
         # Store proofs sent in last n ticks.
-        self.recent_sent_proofs = [set() for _ in range(self.send_proof_every)]
+        self.recent_sent_proofs = RingBuffer(self.send_proof_every, lambda: set())
 
         self.queued_proofs: List[Tuple[int, EID]] = []
 
@@ -161,7 +161,7 @@ class PoTProver(VehicleModule):
             if not eid: # No match.
                 continue
 
-            if any(numberplate in i for i in self.recent_sent_proofs):
+            if any(numberplate in i for i in self.recent_sent_proofs.data):
                 # Do not send duplicate proofs.
                 #print("skip duplicate proof for objid", objid)
                 continue
@@ -184,13 +184,13 @@ class PoTProver(VehicleModule):
             input.proofs.append(proof_entry)
 
             # Record proofs sent in this tick.
-            self.recent_sent_proofs[-1].add(numberplate)
+            self.recent_sent_proofs.current.add(numberplate)
 
         # If we have spaces for more proofs, fill them with queued proofs.
         while len(input.proofs) < 8 and len(self.queued_proofs) > 0:
             proof_entry = self.queued_proofs.pop(0)
             input.proofs.append(proof_entry)
-            self.recent_sent_proofs[-1].add(proof_entry[0])
+            self.recent_sent_proofs.current.add(proof_entry[0])
 
         input._objid_to_numberplate = {}
 
@@ -237,7 +237,7 @@ class PoTProver(VehicleModule):
 
     def flush(self) -> None:
         # Renew the recent_sent_proofs.
-        self.recent_sent_proofs = self.recent_sent_proofs[1:] + [set()]
+        self.recent_sent_proofs.advance()
 
 
 class PoTVerifier(VehicleModule):
