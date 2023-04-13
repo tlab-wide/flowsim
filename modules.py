@@ -49,38 +49,30 @@ class Planner(VehicleModule):
     # Planning module
 
     def __init__(self, vehicle: 'Vehicle'):
-
         super().__init__(vehicle)
 
-        self.obj_seen: List[set] = []
-
-        self.then = -1
+        self.recent_seen_objects = [set() for _ in range(10)]
 
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
-        now = self.vehicle.scenario.now
-
-        if self.then != now:
-            self.then = now
-            self.obj_seen.insert(0, set())
-            if len(self.obj_seen) > 10:
-                self.obj_seen.pop()
-
         for objid, pos in input.perceived_objects:
-            self.obj_seen[0].add(objid)
+            self.recent_seen_objects[0].add(objid)
 
         return None
 
     def recent_seen_objids(self) -> Set[int]:
-        return functools.reduce(lambda x, y: x.union(y), self.obj_seen, set())
+        return functools.reduce(lambda x, y: x.union(y), self.recent_seen_objects, set())
+
+    def flush(self) -> None:
+        # Renew the recent_seen_objects.
+        self.recent_seen_objects = self.recent_seen_objects[1:] + [set()]
 
 class CPSReceiver(VehicleModule):
     def do_work(self, input: None) -> List[CPM]:
         assert input == None, f"Module {self.__class__.__name__} requires no input."
 
         return self.vehicle.scenario.network.receive(self.vehicle)
-        
 
 class CPSSender(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
