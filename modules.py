@@ -123,7 +123,7 @@ class PoTProver(VehicleModule):
         self.known_numberplates: Set[NumberPlate] = set()
 
         # EIDs left unmatched.
-        self.unmatched_eids: Set[EID] = set()
+        self.recent_unmatched_eids = RingBuffer(10, lambda: set())
 
         # Two-way Numberplate to EID mapping.
         # Only latest EID of a Numberplate is recorded.
@@ -139,18 +139,22 @@ class PoTProver(VehicleModule):
         self.n_dropped_proofs: int = 0
 
     def update_matches(self):
-        # Update match repository.
+        # Update match repository against recent unmatched EIDs.
+        for s in self.recent_unmatched_eids.data:
+            to_remove = []
+            for e in s:
+                n = self.vehicle.scenario.match.match_eid(self.known_numberplates, e)
 
-        for e in list(self.unmatched_eids):
-            n = self.vehicle.scenario.match.match_eid(self.known_numberplates, e)
+                if n == None: # No match.
+                    continue
 
-            if n == None: # No match.
-                continue
+                to_remove.append(e)
 
-            self.unmatched_eids.remove(e)
+                self._eid_to_numberplate[e] = n
+                self._numberplate_to_eid[n] = e
 
-            self._eid_to_numberplate[e] = n
-            self._numberplate_to_eid[n] = e
+            for e in to_remove:
+                s.remove(e)
 
     def generate_proofs(self, input: CPM) -> CPM:
         # Generate proofs for all matched vehicles in the given CPM.
@@ -211,7 +215,7 @@ class PoTProver(VehicleModule):
             self._numberplate_to_eid[n] = e
         else:
             # Only keep unmatched EIDs.
-            self.unmatched_eids.add(e)
+            self.recent_unmatched_eids.current.add(e)
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
@@ -234,11 +238,10 @@ class PoTProver(VehicleModule):
 
         return self.generate_proofs(input)
 
-
     def flush(self) -> None:
-        # Renew the recent_sent_proofs.
+        # Advance the recent_sent_proofs and recent_unmatched_eids.
         self.recent_sent_proofs.advance()
-
+        self.recent_unmatched_eids.advance()
 
 class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
