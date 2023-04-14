@@ -3,6 +3,8 @@ from typing import *
 import dataclasses
 import atexit
 import abc
+import numpy as np
+import math
 
 import traci
 import math
@@ -367,7 +369,7 @@ class PositionManagerV2(object):
         candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
 
         # Filter out vehicles > range_limit away.
-        ret = [ v for v in candidates if (self._position[v] - position).to_polar()[0] < self.range_limit ]
+        ret = [ v for v in candidates if self._position[v].distance_to(position) < range_limit ]
         self.result_cache[position] = ret
 
         return ret
@@ -586,6 +588,139 @@ class PerceptionSimulatorV2(object):
             pass
 
         return ret
+
+class PerceptionSimulatorV3(object):
+    ''' A more realistic perception simulator. '''
+    def __init__(self, scenario: Scenario):
+        self.scenario = scenario
+        self.vehicles = scenario.vehicles
+        self.random = random_from(scenario.random)
+        self.config = scenario.config['perception_simulator']
+        self.vision_distance = self.config['vision_distance']
+        self.fov = abs(self.config['fov']) * math.pi / 180
+        self.target_max_rotation = abs(self.config['target_max_rotation']) * math.pi / 180
+
+        self.position_manager = scenario.position_manager
+
+        # Ground truth.
+        # Note that one numberplate can have multiple object ids.
+        # This happens when a vehicle changes its EID.
+        self._gt_eid_to_objectid: Dict[EID, int] = {}
+        self._gt_objectid_to_eid: List[EID] = []
+        self._gt_objectid_to_numberplate: List[NumberPlate] = []
+
+    def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
+        # Return all perceived objects and their positions of the given egovehicle.
+
+        # Ego vehicle's position is the center of front bumper.
+        camera = ego.position
+
+        candidates = self.position_manager.get_nearby_vehicles(camera)
+        candidates = [v for v in candidates if v != ego and v.position.distance_to(camera) < self.vision_distance]
+
+        candidate_lines = self.get_projected_lines(camera, candidates)
+
+        return self.get_visible_objects(camera, candidate_lines)
+
+    def get_projected_lines(self, camera: Position, candidates: List[Vehicle]) -> List[dict]:
+        # Get projected lines (Vehicle, diagnoal, numberplate) of all candidates, sorted increasingly by distance to the camera.
+        # The lines are projected (straightened) on a number axis, representing the viewing angle [-pi, pi) from the camera.
+
+        x0, y0, beta0 = camera.x, camera.y, camera.heading
+        beta0 = beta0 * math.pi / 180
+
+        # Get the length, width, and numberplate length of all candidates.
+        length = np.array([v.length for v in candidates], dtype=np.float32)
+        width = np.array([v.width for v in candidates], dtype=np.float32)
+        numberplate_width = np.array([v.numberplate_width for v in candidates], dtype=np.float32)
+
+        # Get Position of center of front bumper of all candidates.
+        candidates_front_bumper: List[Position] = [v.position for v in candidates]
+
+        x = np.array([p.x for p in candidates_front_bumper], dtype=np.float32)
+        y = np.array([p.y for p in candidates_front_bumper], dtype=np.float32)
+
+        beta = np.array([p.heading for p in candidates_front_bumper], dtype=np.float32)
+        beta = beta * math.pi / 180
+
+        # Convert the positions to the relative position of camera.
+        convertion_matrix = np.array([
+            [np.cos(beta0), np.sin(beta0)],
+            [-np.sin(beta0), np.cos(beta0)],
+        ])
+        F = np.matmul(convertion_matrix, np.array([x - x0, y - y0]))
+
+        # Convert the headings to the relative position of camera.
+        beta = beta - beta0
+
+        # ========================================
+        #  Using camera reference frame from here
+        # ========================================
+
+        # Center.
+        O = F - 0.5 * np.array([np.cos(beta), np.sin(beta)]) * length[:, np.newaxis]
+
+        # If b is not in the range of [-pi, pi], normalize it.
+        # This effectively flips the vehicle along its heading.
+        beta = np.mod(beta + math.pi, 2 * math.pi) - math.pi
+        cosb = np.cos(beta)
+        sinb = np.sin(beta)
+
+        # Center of front and rear bumpers.
+        F = O + 0.5 * np.array([cosb, sinb]) * length[:, np.newaxis]
+        G = O - 0.5 * np.array([cosb, sinb]) * length[:, np.newaxis]
+
+        # Four corners. A = left front, B = right front, C = right rear, D = left rear.
+        A = F - 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
+        B = F + 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
+        C = G + 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
+        D = G - 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
+
+        # Numberplates. N and M should be on DC and D < M < N < C.
+        M = G - 0.5 * np.array([cosb, sinb]) * numberplate_width[:, np.newaxis]
+        N = G + 0.5 * np.array([cosb, sinb]) * numberplate_width[:, np.newaxis]
+
+        # Angles of all corners and numberplates.
+        delta1 = np.arctan2(A[1], A[0])
+        delta2 = np.arctan2(B[1], B[0])
+        delta3 = np.arctan2(C[1], C[0])
+        delta4 = np.arctan2(D[1], D[0])
+        delta_min = np.min([delta1, delta2, delta3, delta4], axis=0)
+        delta_max = np.max([delta1, delta2, delta3, delta4], axis=0)
+
+        rho1   = np.arctan2(M[1], M[0])
+        rho2   = np.arctan2(N[1], N[0])
+        rho_min = np.min([rho1, rho2], axis=0)
+        rho_max = np.max([rho1, rho2], axis=0)
+        assert (rho_min == rho1).all()
+
+        # Angles of G.
+        gamma = np.arctan2(G[1], G[0])
+
+        # Distance of G from camera.
+        dist = np.linalg.norm(G, axis=0)
+
+        # Collect data.
+        ret = [{
+                'vehicle': v,
+                'diagnoal': (delta_min[i], delta_max[i]),
+                'numberplate': (rho_min[i], rho_max[i]),
+                'beta': beta[i],
+                'gamma': gamma[i],
+                'dist': dist[i],
+        } for i, v in enumerate(candidates)]
+
+        # Filter out vehicles that are not in the camera's field of view.
+        ret = [r for r in ret if not (r['diagnoal'][0] > self.fov or r['diagnoal'][1] < -self.fov)]
+
+        # Filter out vehicles whose numberplates are too skewed.
+        ret = [r for r in ret if abs(r['gamma'] - r['beta']) < self.max_rotation]
+
+        # Sort by distance.
+        ret = sorted(ret, key=lambda r: r['dist'])
+
+        return ret
+
 
 class MatchSimulator(object):
     def __init__(self, scenario: Scenario):

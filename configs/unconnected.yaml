@@ -30,7 +30,8 @@ network_simulator:
 
 perception_simulator:
   vision_distance: 80 # meters
-  vision_angle: 60 # degrees (of one side)
+  fov: 60 # degrees (of one side)
+  target_max_rotation: 60 # degrees (of one side)
 
 vehicle:
   width: 1.84
