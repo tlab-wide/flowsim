@@ -70,38 +70,6 @@ class Vehicle(object):
     def __hash__(self):
         return hash(self.numberplate)
 
-    def get_lines(self):
-        width: float = self.config['width']
-        length: float = self.config['length']
-        width_plate: float = self.config['width_plate']
-
-        percent_plate = width_plate / width
-
-        px = self.position.x
-        py = self.position.y
-        heading = self.position.heading
-
-        rad = math.radians(heading)
-
-        d2lx = length * math.cos(rad)
-        d2ly = length * math.sin(rad)
-        dwx = width / 2 * math.cos(rad)
-        dwy = width / 2 * math.sin(rad)
-
-        # FR, FL, BR, BL
-        positions = [
-            Position(px + dwx, py - dwy),
-            Position(px - dwx, py + dwy),
-            Position(px - d2lx + dwx, py - d2ly - dwy),
-            Position(px - d2lx - dwx, py - d2ly + dwy)
-        ]
-        diagonal1 = Line(positions[0], positions[3])
-        diagonal2 = Line(positions[1], positions[2])
-        plate1 = Line(positions[0], positions[1], self.numberplate).get_subline(percent_plate)
-        plate2 = Line(positions[2], positions[3], self.numberplate).get_subline(percent_plate)
-
-        return (diagonal1, diagonal2, plate1, plate2)
-
     def change_eid(self):
         self.eid = '%064x' % (self.random.randint(0, 2**256 - 1))
 

@@ -105,131 +105,51 @@ class Position(object):
     def __repr__(self):
         return f"({self.x}, {self.y})"
 
-@dataclasses.dataclass
-class Line:
-    a: Position
-    b: Position
-    numberplate: str = None
+@dataclass
+class SegmentTreeNode:
+    start: float
+    end: float
+    left: Optional['SegmentTreeNode'] = None
+    right: Optional['SegmentTreeNode'] = None
+    covered: bool = False
 
-    def __repr__(self) -> str:
-        return f'Line({self.a}, {self.b})'
+class SegmentTree:
+    def __init__(self, all_points):
+        self._sorted_points = sorted(all_points)
+        self.mapping = {p: i for i, p in enumerate(self._sorted_points)}
+        self.root = SegmentTreeNode(0, len(self._sorted_points) - 1)
 
-    def __len__(self):
-        return self.a.distance_to(self.b)
+    def _insert(self, node, start, end):
+        if node is None:
+            return SegmentTreeNode(self.mapping[start], self.mapping[end])
 
-    def __hash__(self):
-        return hash(self.a) * (10 ** (self.a.HASH_ACCURACY_DECIMAL << 1)) + hash(self.b)
-
-    def get_angle_to_position(self, position: Position):
-        return math.fabs((self.a - position).to_polar()[1] - (self.b - position).to_polar()[1])
-
-    def get_subline(self, percent: float = 0.25, center: float = 0.5) -> Line:
-        left = max(center - percent / 2.0, 0.0)
-        right = min(center + percent / 2.0, 1.0)
-        vector = self.a - self.b
-        new_lp = Position(self.a.x + vector.x * left, self.a.y + vector.y * left)
-        new_rp = Position(self.a.x + vector.x * right, self.a.y + vector.y * right)
-        return Line(new_lp, new_rp, self.numberplate)
-
-
-@dataclasses.dataclass
-class Node:
-    def __init__(self, angle_start: float = 0.0, angle_end: float = 360.0, data: Line = None,
-                 left: 'Node' = None, right: 'Node' = None):
-        self.angle_start = angle_start
-        self.angle_end = angle_end
-        self.data = data
-        self.left = left
-        self.right = right
-
-        if self.angle_start < 0.0:
-            self.left = Node(angle_end=self.angle_end)
-            self.right = Node(angle_start=self.angle_start + 360.0)
-        elif self.angle_end > 360.0:
-            self.left = Node(angle_end=self.angle_end - 360.0)
-            self.right = Node(angle_start=self.angle_start)
-
-    def get_lines(self) -> set[Line]:
-        lines = []
-        stack = []
-
-        stack.append(self)
-        while len(stack) > 0:
-            last = stack.pop()
-            if last is not None:
-                stack.append(last.left)
-                stack.append(last.right)
-                if last.data is not None and last.data.numberplate is not None:
-                    lines.append(last.data)
-
-        return set(lines)
-
-    def __available(self, angle_start: float = 0.0, angle_end: float = 360.0):
-        if angle_start > angle_end:
-            angle_end, angle_start = angle_start, angle_end
-
-        if angle_end - angle_start > 180.0:
-            return self.__available(angle_start=angle_end) and self.__available(angle_end=angle_start)
-
-        if self.left is None and self.right is None:
-            return self.angle_start <= angle_start < angle_end <= self.angle_end
+        if end <= node.start:
+            node.left = self._insert(node.left, start, end)
+        elif start >= node.end:
+            node.right = self._insert(node.right, start, end)
         else:
-            return self.left.__available(angle_start, angle_end) or self.right.__available(angle_start, angle_end)
+            mid = (node.start + node.end) // 2
+            node.left = self._insert(node.left, start, self._sorted_points[mid - 1])
+            node.right = self._insert(node.right, self._sorted_points[mid], end)
 
-    def __update_leftmost(self, data: Line, angle_start: float):
-        if self.data is not None:
-            self.left.__update_leftmost(data, angle_start)
+        return node
+
+    def insert(self, start, end):
+        self.root = self._insert(self.root, start, end)
+
+    def _query(self, node, start, end):
+        if node is None:
+            return False
+
+        if start <= node.start and end >= node.end:
+            return node.covered
+        elif end <= node.start or start >= node.end:
+            return False
         else:
-            self.data = data
-            self.left = Node(angle_end=0.0)
-            self.right = Node(angle_start=angle_start, angle_end=self.angle_end)
+            return self._query(node.left, start, end) or self._query(node.right, start, end)
 
-    def __update_rightmost(self, angle_end: float):
-        if self.data is not None:
-            self.right.__update_rightmost(angle_end)
-        else:
-            self.left = Node(angle_start=self.angle_start, angle_end=angle_end)
-            self.right = Node(angle_start=360.0)
-
-    def __update_edge(self, data: Line, angle_start: float, angle_end: float):
-        self.__update_leftmost(data, angle_start)
-        self.__update_rightmost(angle_end)
-
-    def update(self, eye: Position, data: Line, angle_start: float = 0.0, angle_end: float = 360.0):
-        if data is None:
-            return
-
-        angle_start = eye.angle_to(data.a)
-        angle_end = eye.angle_to(data.b)
-
-        if angle_start > angle_end:
-            angle_end, angle_start = angle_start, angle_end
-
-        angle_cross_x = angle_end - angle_start > 180.0
-
-        stack = [self]
-        while stack:
-            node = stack.pop()
-
-            if node.left is not None or node.right is not None:
-                stack.append(node.right)
-                stack.append(node.left)
-                continue
-
-            # cross x axis (atan2 == 0)
-            if angle_cross_x and node.__available(angle_start, angle_end):
-                node.__update_edge(data, angle_start, angle_end)
-                return
-
-            if node.angle_start <= angle_start < angle_end <= node.angle_end:
-                node.data = data
-                node.left = Node(node.angle_start, angle_start)
-                node.right = Node(angle_end, node.angle_end)
-                return
-            elif node.angle_start < angle_start < node.angle_end:
-                node.angle_end = angle_start
-            elif node.angle_end > angle_end > node.angle_start:
-                node.angle_start = angle_end
+    def query(self, start, end):
+        return self._query(self.root, self.mapping[start], self.mapping[end])
 
 
 @dataclasses.dataclass

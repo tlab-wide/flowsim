@@ -34,7 +34,7 @@ class Scenario(object):
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         #self.perception = PerceptionSimulator(self)
-        self.perception = PerceptionSimulatorV2(self)
+        self.perception = PerceptionSimulatorV3(self)
         self.match = MatchSimulator(self)
 
         # Create metric collectors.
@@ -517,78 +517,6 @@ class PerceptionSimulator(object):
 
         return ret
 
-class PerceptionSimulatorV2(object):
-    ''' A more realistic perception simulator. '''
-    def __init__(self, scenario: Scenario):
-        self.scenario = scenario
-        self.vehicles = scenario.vehicles
-        self.random = random_from(scenario.random)
-        self.config = scenario.config['perception_simulator']
-        self.vision_distance = self.config['vision_distance']
-        self.vision_angle = abs(self.config['vision_angle'])
-
-        self.position_manager = scenario.position_manager
-
-        # Ground truth.
-        # Note that one numberplate can have multiple object ids.
-        # This happens when a vehicle changes its EID.
-        self._gt_eid_to_objectid: Dict[EID, int] = {}
-        self._gt_objectid_to_eid: List[EID] = []
-        self._gt_objectid_to_numberplate: List[NumberPlate] = []
-
-    def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
-        # Return all perceived objects and their positions of the given egovehicle.
-        candidates = self.position_manager.get_nearby_vehicles(ego.position)
-        dict_numberplate_to_candidate_index = {v.numberplate: i for i, v in enumerate(candidates)}
-        line_candidates = []
-
-        for v in candidates:
-            if v == ego: continue  # Don't count self.
-
-            distance = ego.position.distance_to(v.position)
-            # Do not use > here since it may be nan.
-            if distance < self.vision_distance:
-                (d1, d2, p1, p2) = v.get_lines()
-
-                f = lambda line: min(line.a.distance_to(ego.position), line.b.distance_to(ego.position))
-
-                line_candidates.append(d1 if f(d1) < f(d2) else d2)
-                line_candidates.append(p1 if f(p1) < f(p2) else p2)
-
-        angle_start = ego.position.heading - self.vision_angle
-        angle_end = ego.position.heading + self.vision_angle
-
-        line_candidates = sorted(line_candidates, key=lambda x: min(ego.position.distance_to(x.a), ego.position.distance_to(x.b)))
-        node = Node(angle_start, angle_end)
-
-        for l in line_candidates:
-            node.update(ego.position, data=l)
-
-        line_visible = node.get_lines()
-        ret = []
-
-        for l in line_visible:
-            v = candidates[dict_numberplate_to_candidate_index[l.numberplate]]
-
-            # Record the ground truth if not already.
-            # Object ID will be automatically assigned.
-            if v.eid not in self._gt_eid_to_objectid:
-                self._gt_eid_to_objectid[v.eid] = len(self._gt_objectid_to_eid)
-                self._gt_objectid_to_eid.append(v.eid)
-                self._gt_objectid_to_numberplate.append(v.numberplate)
-
-            ret.append((
-                self._gt_eid_to_objectid[v.eid],
-                v.position,
-                v.numberplate,
-            ))
-        
-        if ret:
-            #print("[%s] objects: %s" % (ego.numberplate, ret))
-            pass
-
-        return ret
-
 class PerceptionSimulatorV3(object):
     ''' A more realistic perception simulator. '''
     def __init__(self, scenario: Scenario):
@@ -618,13 +546,44 @@ class PerceptionSimulatorV3(object):
         candidates = self.position_manager.get_nearby_vehicles(camera)
         candidates = [v for v in candidates if v != ego and v.position.distance_to(camera) < self.vision_distance]
 
+        # Filter and project all candidates on a number axis of the camera's viewing angle.
         candidate_lines = self.get_projected_lines(camera, candidates)
 
-        return self.get_visible_objects(camera, candidate_lines)
+        candidate_lines = self.get_visible_objects(camera, candidate_lines)
+
+        # Filter out vehicles whose numberplates are too skewed.
+        # This filtering should be done last because some "unidentifiable" vehicles may also occlude the others.
+        candidate_lines = [r for r in candidates if abs(r['gamma'] - r['beta']) < self.target_max_rotation]
+
+        return [
+            (self._gt_eid_to_objectid[r['vehicle'].eid], r['vehicle'].position, r['vehicle'].numberplate)
+        for r in candidate_lines]
+
+    def get_visible_lines(self, camera: Position, candidate_lines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Calculate occlusion and return the visible vehicles in projection format.
+        # The returned list is sorted by the distance to the camera.
+
+        if not candidate_lines: return []
+
+        all_points = sum([
+            (i['delta1'], i['delta2'], i['rho1'], i['rho2'])
+        for i in candidate_lines], [])
+        tree = SegmentTree(all_points)
+
+        ret = [candidate_lines[0]]
+
+        for l, m in zip(candidate_lines[:-1], candidate_lines[1:]):
+            tree.insert(l['delta1'], l['delta2'])
+            if tree.query(m['rho1'], m['rho2']) == False:
+                ret.append(m)
+
+        return ret
 
     def get_projected_lines(self, camera: Position, candidates: List[Vehicle]) -> List[dict]:
         # Get projected lines (Vehicle, diagnoal, numberplate) of all candidates, sorted increasingly by distance to the camera.
         # The lines are projected (straightened) on a number axis, representing the viewing angle [-pi, pi) from the camera.
+
+        if not candidates: return []
 
         x0, y0, beta0 = camera.x, camera.y, camera.heading
         beta0 = beta0 * math.pi / 180
