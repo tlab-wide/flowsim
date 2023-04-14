@@ -36,7 +36,7 @@ perception_simulator:
 vehicle:
   width: 1.84
   length: 4.88
-  width_plate: 0.35
+  numberplate_width: 0.35
   eid_changing_possibility: 0.0001
   pot_verifier_max_unverified_per_vehicle: 20
   PoTProver:

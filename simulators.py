@@ -369,7 +369,7 @@ class PositionManagerV2(object):
         candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
 
         # Filter out vehicles > range_limit away.
-        ret = [ v for v in candidates if self._position[v].distance_to(position) < range_limit ]
+        ret = [ v for v in candidates if self._position[v].distance_to(position) < self.range_limit ]
         self.result_cache[position] = ret
 
         return ret
@@ -549,11 +549,20 @@ class PerceptionSimulatorV3(object):
         # Filter and project all candidates on a number axis of the camera's viewing angle.
         candidate_lines = self.get_projected_lines(camera, candidates)
 
-        candidate_lines = self.get_visible_objects(camera, candidate_lines)
+        candidate_lines = self.get_visible_lines(camera, candidate_lines)
 
         # Filter out vehicles whose numberplates are too skewed.
         # This filtering should be done last because some "unidentifiable" vehicles may also occlude the others.
-        candidate_lines = [r for r in candidates if abs(r['gamma'] - r['beta']) < self.target_max_rotation]
+        candidate_lines = [r for r in candidate_lines if abs(r['gamma'] - r['beta']) < self.target_max_rotation]
+
+        for r in candidate_lines:
+            v = r['vehicle']
+            # Record the ground truth if not already.
+            # Object ID will be automatically assigned.
+            if v.eid not in self._gt_eid_to_objectid:
+                self._gt_eid_to_objectid[v.eid] = len(self._gt_objectid_to_eid)
+                self._gt_objectid_to_eid.append(v.eid)
+                self._gt_objectid_to_numberplate.append(v.numberplate)
 
         return [
             (self._gt_eid_to_objectid[r['vehicle'].eid], r['vehicle'].position, r['vehicle'].numberplate)
@@ -566,7 +575,7 @@ class PerceptionSimulatorV3(object):
         if not candidate_lines: return []
 
         all_points = sum([
-            (i['delta1'], i['delta2'], i['rho1'], i['rho2'])
+            [i['delta1'], i['delta2'], i['rho1'], i['rho2']]
         for i in candidate_lines], [])
         tree = SegmentTree(all_points)
 
@@ -589,9 +598,9 @@ class PerceptionSimulatorV3(object):
         beta0 = beta0 * math.pi / 180
 
         # Get the length, width, and numberplate length of all candidates.
-        length = np.array([v.length for v in candidates], dtype=np.float32)
-        width = np.array([v.width for v in candidates], dtype=np.float32)
-        numberplate_width = np.array([v.numberplate_width for v in candidates], dtype=np.float32)
+        length = np.array([v.config['length'] for v in candidates], dtype=np.float32)
+        width = np.array([v.config['width'] for v in candidates], dtype=np.float32)
+        numberplate_width = np.array([v.config['numberplate_width'] for v in candidates], dtype=np.float32)
 
         # Get Position of center of front bumper of all candidates.
         candidates_front_bumper: List[Position] = [v.position for v in candidates]
@@ -662,7 +671,7 @@ class PerceptionSimulatorV3(object):
             'gamma': gamma[i],
             'delta1': delta_min[i],
             'delta2': delta_max[i],
-            'rho1': rho_min[i]
+            'rho1': rho_min[i],
             'rho2': rho_max[i],
         } for i, v in enumerate(candidates)]
 

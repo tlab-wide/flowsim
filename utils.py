@@ -105,7 +105,7 @@ class Position(object):
     def __repr__(self):
         return f"({self.x}, {self.y})"
 
-@dataclass
+@dataclasses.dataclass
 class SegmentTreeNode:
     start: float
     end: float
