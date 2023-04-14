@@ -636,19 +636,15 @@ class PerceptionSimulatorV3(object):
 
         # Get Position of center of front bumper of all candidates.
         candidates_front_bumper: List[Position] = [v.position for v in candidates]
-
         x = np.array([p.x for p in candidates_front_bumper], dtype=np.float32)
         y = np.array([p.y for p in candidates_front_bumper], dtype=np.float32)
+        beta = np.array([p.heading for p in candidates_front_bumper], dtype=np.float32) * math.pi / 180
 
-        beta = np.array([p.heading for p in candidates_front_bumper], dtype=np.float32)
-        beta = beta * math.pi / 180
-
-        # Convert the positions to the relative position of camera.
-        convertion_matrix = np.array([
-            [np.cos(beta0), np.sin(beta0)],
+        # Convert the positions to the relative position of camera. The rotation is effectively **-beta0**.
+        F = np.array([
+            [ np.cos(beta0), np.sin(beta0)],
             [-np.sin(beta0), np.cos(beta0)],
-        ])
-        F = np.matmul(convertion_matrix, np.array([x - x0, y - y0]))
+        ]) @ np.array([x - x0, y - y0])
 
         # Convert the headings to the relative position of camera.
         beta = beta - beta0
@@ -660,33 +656,27 @@ class PerceptionSimulatorV3(object):
         origin = np.zeros_like(F)
 
         # Center.
-        O = F - 0.5 * np.array([np.cos(beta), np.sin(beta)]) * length[:, np.newaxis]
-
-        #print(f"F: {F.T[0]}; O: {O.T[0]}")
+        O = F - 0.5 * length * np.array([np.cos(beta), np.sin(beta)])
 
         # If b is not in the range of [-pi/2, pi/2], normalize it.
         # This effectively flips the vehicle along its heading.
         beta = np.mod(beta + math.pi / 2, math.pi) - math.pi / 2
-        cosb = np.cos(beta)
-        sinb = np.sin(beta)
+        front = np.array([np.cos(beta), np.sin(beta)])
+        perp = np.array([-np.sin(beta), np.cos(beta)])
 
         # Center of front and rear bumpers.
-        F = O + 0.5 * np.array([cosb, sinb]) * length[:, np.newaxis]
-        G = O - 0.5 * np.array([cosb, sinb]) * length[:, np.newaxis]
+        F = O + 0.5 * length * front
+        G = O - 0.5 * length * front
 
         # Four corners. A = left front, B = right front, C = right rear, D = left rear.
-        A = F - 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
-        B = F + 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
-        C = G + 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
-        D = G - 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
-
-        #print(f"F: {F.T[0]}; G: {G.T[0]}; A: {A.T[0]}; B: {B.T[0]}; C: {C.T[0]}; D: {D.T[0]}")
+        A = F - 0.5 * width * perp
+        B = F + 0.5 * width * perp
+        C = G + 0.5 * width * perp
+        D = G - 0.5 * width * perp
 
         # Numberplates. N and M should be on DC and D < M < N < C.
-        M = G - 0.5 * np.array([sinb, cosb]) * numberplate_width[:, np.newaxis]
-        N = G + 0.5 * np.array([sinb, cosb]) * numberplate_width[:, np.newaxis]
-
-        #print(f"M: {M.T[0]}; N: {N.T[0]}")
+        M = G - 0.5 * numberplate_width * perp
+        N = G + 0.5 * numberplate_width * perp
 
         # Angles of all corners and numberplates.
         delta1 = np.arctan2(A[1], A[0])
@@ -700,29 +690,25 @@ class PerceptionSimulatorV3(object):
         rho2   = np.arctan2(N[1], N[0])
         rho_min = np.min([rho1, rho2], axis=0)
         rho_max = np.max([rho1, rho2], axis=0)
-        assert (rho_min == rho1).all()
 
-        # Angles of G.
-        gamma = np.arctan2(G[1], G[0])
-
-        # Distance of G from camera.
+        # Distance and angle of G from camera.
         dist = np.linalg.norm(G, axis=0)
+        gamma = np.arctan2(G[1], G[0])
 
         # Collect data.
         ret = [{
-                'vehicle': v,
-                'diagnoal': (delta_min[i], delta_max[i]),
-                'numberplate': (rho_min[i], rho_max[i]),
-                'beta': beta[i],
-                'gamma': gamma[i],
-                'dist': dist[i],
+            'vehicle': v,
+            'dist': dist[i],
+            'beta': beta[i],
+            'gamma': gamma[i],
+            'delta1': delta_min[i],
+            'delta2': delta_max[i],
+            'rho1': rho_min[i]
+            'rho2': rho_max[i],
         } for i, v in enumerate(candidates)]
 
         # Filter out vehicles that are not in the camera's field of view.
-        ret = [r for r in ret if not (r['diagnoal'][0] > self.fov or r['diagnoal'][1] < -self.fov)]
-
-        # Filter out vehicles whose numberplates are too skewed.
-        ret = [r for r in ret if abs(r['gamma'] - r['beta']) < self.target_max_rotation]
+        ret = [r for r in ret if not (r['delta1'] > self.fov or r['delta2'] < -self.fov)]
 
         # Sort by distance.
         ret = sorted(ret, key=lambda r: r['dist'])
