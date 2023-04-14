@@ -657,12 +657,16 @@ class PerceptionSimulatorV3(object):
         #  Using camera reference frame from here
         # ========================================
 
+        origin = np.zeros_like(F)
+
         # Center.
         O = F - 0.5 * np.array([np.cos(beta), np.sin(beta)]) * length[:, np.newaxis]
 
-        # If b is not in the range of [-pi, pi], normalize it.
+        #print(f"F: {F.T[0]}; O: {O.T[0]}")
+
+        # If b is not in the range of [-pi/2, pi/2], normalize it.
         # This effectively flips the vehicle along its heading.
-        beta = np.mod(beta + math.pi, 2 * math.pi) - math.pi
+        beta = np.mod(beta + math.pi / 2, math.pi) - math.pi / 2
         cosb = np.cos(beta)
         sinb = np.sin(beta)
 
@@ -671,14 +675,18 @@ class PerceptionSimulatorV3(object):
         G = O - 0.5 * np.array([cosb, sinb]) * length[:, np.newaxis]
 
         # Four corners. A = left front, B = right front, C = right rear, D = left rear.
-        A = F - 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
-        B = F + 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
-        C = G + 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
-        D = G - 0.5 * np.array([sinb, -cosb]) * width[:, np.newaxis]
+        A = F - 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
+        B = F + 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
+        C = G + 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
+        D = G - 0.5 * np.array([sinb, cosb]) * width[:, np.newaxis]
+
+        #print(f"F: {F.T[0]}; G: {G.T[0]}; A: {A.T[0]}; B: {B.T[0]}; C: {C.T[0]}; D: {D.T[0]}")
 
         # Numberplates. N and M should be on DC and D < M < N < C.
-        M = G - 0.5 * np.array([cosb, sinb]) * numberplate_width[:, np.newaxis]
-        N = G + 0.5 * np.array([cosb, sinb]) * numberplate_width[:, np.newaxis]
+        M = G - 0.5 * np.array([sinb, cosb]) * numberplate_width[:, np.newaxis]
+        N = G + 0.5 * np.array([sinb, cosb]) * numberplate_width[:, np.newaxis]
+
+        #print(f"M: {M.T[0]}; N: {N.T[0]}")
 
         # Angles of all corners and numberplates.
         delta1 = np.arctan2(A[1], A[0])
@@ -714,7 +722,7 @@ class PerceptionSimulatorV3(object):
         ret = [r for r in ret if not (r['diagnoal'][0] > self.fov or r['diagnoal'][1] < -self.fov)]
 
         # Filter out vehicles whose numberplates are too skewed.
-        ret = [r for r in ret if abs(r['gamma'] - r['beta']) < self.max_rotation]
+        ret = [r for r in ret if abs(r['gamma'] - r['beta']) < self.target_max_rotation]
 
         # Sort by distance.
         ret = sorted(ret, key=lambda r: r['dist'])
