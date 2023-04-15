@@ -103,7 +103,7 @@ class Position(object):
         )
 
     def __repr__(self):
-        return f"({self.x}, {self.y})"
+        return f'Position(x={self.x}, y={self.y}, heading={self.heading})'
 
 @dataclasses.dataclass
 class SegmentTreeNode:

@@ -360,6 +360,9 @@ class PositionManagerV2(object):
 
     def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
         #return self._nearby_vehicles.get(position, [])
+        if position.x == -1073741824:
+            # This is the teleportation target.
+            return []
         return self._nearby_vehicles[position]
 
     def _update_nearby(self):
