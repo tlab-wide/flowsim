@@ -370,6 +370,7 @@ class PositionManagerV2(object):
         ret = []
 
         for ego, position in self._position.items():
+
             # Offset by two since the grid is padded.
             grid_x = math.floor(position.x / self.range_limit) + 2
             grid_y = math.floor(position.y / self.range_limit) + 2
@@ -423,9 +424,9 @@ class PositionManagerV2(object):
         self._grid = [[set() for _ in range(len(self._grid[0]))] for _ in range(len(self._grid))]
 
         for v, pos in self._position.items():
-            # Offset by one since the grid is padded.
-            grid_x = math.floor(pos.x / self.range_limit) + 1
-            grid_y = math.floor(pos.y / self.range_limit) + 1
+            # Offset by two since the grid is padded.
+            grid_x = math.floor(pos.x / self.range_limit) + 2
+            grid_y = math.floor(pos.y / self.range_limit) + 2
 
             # Do not count this vehicle if the position is out of range.
             # Be careful about the padding.
