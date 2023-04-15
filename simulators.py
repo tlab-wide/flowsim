@@ -345,8 +345,8 @@ class PositionManagerV2(object):
         assert self.boundary[0] == (0, 0)
 
         # Create a grid of grid_x and grid_y with padding.
-        grid_x = math.ceil(self.boundary[1][0] / self.range_limit) + 2
-        grid_y = math.ceil(self.boundary[1][1] / self.range_limit) + 2
+        grid_x = math.ceil(self.boundary[1][0] / self.range_limit) + 4
+        grid_y = math.ceil(self.boundary[1][1] / self.range_limit) + 4
 
         self._grid = [[set() for _ in range(grid_y)] for _ in range(grid_x)]
 
@@ -370,9 +370,9 @@ class PositionManagerV2(object):
         ret = []
 
         for ego, position in self._position.items():
-            # Offset by one since the grid is padded.
-            grid_x = math.floor(position.x / self.range_limit) + 1
-            grid_y = math.floor(position.y / self.range_limit) + 1
+            # Offset by two since the grid is padded.
+            grid_x = math.floor(position.x / self.range_limit) + 2
+            grid_y = math.floor(position.y / self.range_limit) + 2
 
             # Do nothing if the position is out of range.
             if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
