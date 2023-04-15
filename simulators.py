@@ -549,6 +549,12 @@ class PerceptionSimulatorV3(object):
         # Filter and project all candidates on a number axis of the camera's viewing angle.
         candidate_lines = self.get_projected_lines(camera, candidates)
 
+        # Filter out vehicles that are not in the camera's field of view.
+        candidate_lines = [r for r in candidate_lines if not (r['delta1'] > self.fov or r['delta2'] < -self.fov)]
+
+        # Sort by distance.
+        candidate_lines = sorted(candidate_lines, key=lambda r: r['dist'])
+
         candidate_lines = self.get_visible_lines(camera, candidate_lines)
 
         # Filter out vehicles whose numberplates are too skewed.
@@ -589,7 +595,7 @@ class PerceptionSimulatorV3(object):
         return ret
 
     def get_projected_lines(self, camera: Position, candidates: List[Vehicle]) -> List[dict]:
-        # Get projected lines (Vehicle, diagnoal, numberplate) of all candidates, sorted increasingly by distance to the camera.
+        # Get projected lines (Vehicle, diagnoal, numberplate) of all vehicles.
         # The lines are projected (straightened) on a number axis, representing the viewing angle [-pi, pi) from the camera.
 
         if not candidates: return []
@@ -620,8 +626,6 @@ class PerceptionSimulatorV3(object):
         # ========================================
         #  Using camera reference frame from here
         # ========================================
-
-        origin = np.zeros_like(F)
 
         # Center.
         O = F - 0.5 * length * np.array([np.cos(beta), np.sin(beta)])
@@ -664,7 +668,7 @@ class PerceptionSimulatorV3(object):
         gamma = np.arctan2(G[1], G[0])
 
         # Collect data.
-        ret = [{
+        return [{
             'vehicle': v,
             'dist': dist[i],
             'beta': beta[i],
@@ -674,15 +678,6 @@ class PerceptionSimulatorV3(object):
             'rho1': rho_min[i],
             'rho2': rho_max[i],
         } for i, v in enumerate(candidates)]
-
-        # Filter out vehicles that are not in the camera's field of view.
-        ret = [r for r in ret if not (r['delta1'] > self.fov or r['delta2'] < -self.fov)]
-
-        # Sort by distance.
-        ret = sorted(ret, key=lambda r: r['dist'])
-
-        return ret
-
 
 class MatchSimulator(object):
     def __init__(self, scenario: Scenario):
