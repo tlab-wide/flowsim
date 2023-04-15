@@ -342,8 +342,8 @@ class PositionManagerV2(object):
 
         self._grid = [[set() for _ in range(grid_y)] for _ in range(grid_x)]
 
-        # Cache results to speed up get_nearby_vehicles.
-        self.result_cache = {}
+        # Nearby vehicles of a position.
+        self._nearby_vehicles = {}
 
         print("PositionManagerV2 initialized with boundary %s, grid size %d x %d" % (self.boundary, grid_x, grid_y))
 
@@ -351,35 +351,34 @@ class PositionManagerV2(object):
         return self._position[vehicle]
 
     def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
-        # Get nearby vehicles from given position.
+        #return self._nearby_vehicles.get(position, [])
+        return self._nearby_vehicles[position]
 
-        if position in self.result_cache:
-            return self.result_cache[position]
+    def _update_nearby(self):
+        # Update nearby vehicles for position of all vehicles.
+        ret = []
 
-        # Offset by one since the grid is padded.
-        grid_x = math.floor(position.x / self.range_limit) + 1
-        grid_y = math.floor(position.y / self.range_limit) + 1
+        for ego, position in self._position.items():
+            # Offset by one since the grid is padded.
+            grid_x = math.floor(position.x / self.range_limit) + 1
+            grid_y = math.floor(position.y / self.range_limit) + 1
 
-        # Return nothing if the position is out of range.
-        # Be careful about the padding.
-        if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
-            return []
+            # Do nothing if the position is out of range.
+            if not 0 < grid_x <= self.boundary[1][0] or not 0 < grid_y <= self.boundary[1][1]:
+                continue
 
-        # Get all vehicles in the 9 adjacent grids as candidates.
-        candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
+            # Get all vehicles in the 9 adjacent grids as candidates.
+            candidates = set.union(*[self._grid[grid_x + i][grid_y + j] for i in [-1, 0, 1] for j in [-1, 0, 1]])
 
-        # Filter out vehicles > range_limit away.
-        ret = [ v for v in candidates if self._position[v].distance_to(position) < self.range_limit ]
-        self.result_cache[position] = ret
+            # Filter out ego and vehicles > range_limit away.
+            results = [v for v in candidates if self._position[v].distance_to(position) < self.range_limit and v != ego]
+            ret.append((position, results))
 
-        return ret
+        self._nearby_vehicles = dict(ret)
 
     def update_all_position(self):
         # Set vehicles' positions to the data at the given tick.
         self._position = {}
-
-        # Invalidate cache.
-        self.result_cache = {}
 
         for numberplate, v in self.vehicles.items():
             # Subscribe to the vehicle if not already subscribed.
@@ -404,6 +403,9 @@ class PositionManagerV2(object):
 
         # Update the grid.
         self._update_grid()
+
+        # Update the results.
+        self._update_nearby()
 
     def _update_grid(self):
         # Recreate grid.
