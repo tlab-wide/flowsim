@@ -548,7 +548,7 @@ class PerceptionSimulatorV3(object):
 
         # Project all candidates on a number axis of the camera's viewing angle.
         candidate_positions = [v.position for v in candidates]
-        candidate_lines = self.get_projected_lines_v2(
+        candidate_lines = self.get_projected_lines(
             camera,
             ego.config['length'],ego.config['width'], ego.config['numberplate_width'],
             candidate_positions,
@@ -609,75 +609,77 @@ class PerceptionSimulatorV3(object):
         if not candidate_positions: return []
 
         x0, y0, beta0 = camera.x, camera.y, camera.heading * math.pi / 180
+        cosbeta0, sinbeta0 = math.cos(beta0), math.sin(beta0)
 
-        # Get Position of center of front bumper of all candidates.
-        x = np.array([p.x for p in candidate_positions], dtype=np.float32)
-        y = np.array([p.y for p in candidate_positions], dtype=np.float32)
-        beta = np.array([p.heading for p in candidate_positions], dtype=np.float32) * math.pi / 180
+        ret = []
+        for i in candidate_positions:
+            # Get Position of center of front bumper of all candidates.
+            # Convert the positions to the relative position of camera. The rotation is effectively **-beta0**.
+            x, y, beta = i.x, i.y, i.heading * math.pi / 180
+            F = (
+                 cosbeta0 * (x - x0) + sinbeta0 * (y - y0),
+                -sinbeta0 * (x - x0) + cosbeta0 * (y - y0),
+            )
 
-        # Convert the positions to the relative position of camera. The rotation is effectively **-beta0**.
-        F = np.array([
-            [ np.cos(beta0), np.sin(beta0)],
-            [-np.sin(beta0), np.cos(beta0)],
-        ]) @ np.array([x - x0, y - y0])
+            # Convert the headings to the relative position of camera.
+            beta -= beta0
 
-        # Convert the headings to the relative position of camera.
-        beta = beta - beta0
+            # ========================================
+            #  Using camera reference frame from here
+            # ========================================
 
-        # ========================================
-        #  Using camera reference frame from here
-        # ========================================
+            # Center.
+            O = (F[0] - 0.5 * length * math.cos(beta), F[1] - 0.5 * length * math.sin(beta))
 
-        # Center.
-        O = F - 0.5 * length * np.array([np.cos(beta), np.sin(beta)])
+            # If b is not in the range of [-pi/2, pi/2], normalize it.
+            # This effectively flips the vehicle along its heading.
+            beta = (beta + math.pi / 2) % math.pi - math.pi / 2
+            front = (math.cos(beta), math.sin(beta))
+            perp = (-math.sin(beta), math.cos(beta))
 
-        # If b is not in the range of [-pi/2, pi/2], normalize it.
-        # This effectively flips the vehicle along its heading.
-        beta = np.mod(beta + math.pi / 2, math.pi) - math.pi / 2
-        front = np.array([np.cos(beta), np.sin(beta)])
-        perp = np.array([-np.sin(beta), np.cos(beta)])
+            # Center of front and rear bumpers.
+            F = (O[0] + 0.5 * length * front[0], O[1] + 0.5 * length * front[1])
+            G = (O[0] - 0.5 * length * front[0], O[1] - 0.5 * length * front[1])
 
-        # Center of front and rear bumpers.
-        F = O + 0.5 * length * front
-        G = O - 0.5 * length * front
+            # Four corners. A = left front, B = right front, C = right rear, D = left rear.
+            A = (F[0] - 0.5 * width * perp[0], F[1] - 0.5 * width * perp[1])
+            B = (F[0] + 0.5 * width * perp[0], F[1] + 0.5 * width * perp[1])
+            C = (G[0] + 0.5 * width * perp[0], G[1] + 0.5 * width * perp[1])
+            D = (G[0] - 0.5 * width * perp[0], G[1] - 0.5 * width * perp[1])
 
-        # Four corners. A = left front, B = right front, C = right rear, D = left rear.
-        A = F - 0.5 * width * perp
-        B = F + 0.5 * width * perp
-        C = G + 0.5 * width * perp
-        D = G - 0.5 * width * perp
+            # Numberplates. N and M should be on DC and D < M < N < C.
+            M = (G[0] - 0.5 * numberplate_width * perp[0], G[1] - 0.5 * numberplate_width * perp[1])
+            N = (G[0] + 0.5 * numberplate_width * perp[0], G[1] + 0.5 * numberplate_width * perp[1])
 
-        # Numberplates. N and M should be on DC and D < M < N < C.
-        M = G - 0.5 * numberplate_width * perp
-        N = G + 0.5 * numberplate_width * perp
+            # Angles of all corners and numberplates.
+            delta1 = math.atan2(A[1], A[0])
+            delta2 = math.atan2(B[1], B[0])
+            delta3 = math.atan2(C[1], C[0])
+            delta4 = math.atan2(D[1], D[0])
+            delta_min = min(delta1, delta2, delta3, delta4)
+            delta_max = max(delta1, delta2, delta3, delta4)
 
-        # Angles of all corners and numberplates.
-        delta1 = np.arctan2(A[1], A[0])
-        delta2 = np.arctan2(B[1], B[0])
-        delta3 = np.arctan2(C[1], C[0])
-        delta4 = np.arctan2(D[1], D[0])
-        delta_min = np.min([delta1, delta2, delta3, delta4], axis=0)
-        delta_max = np.max([delta1, delta2, delta3, delta4], axis=0)
+            rho1 = math.atan2(M[1], M[0])
+            rho2 = math.atan2(N[1], N[0])
+            rho_min = min(rho1, rho2)
+            rho_max = max(rho1, rho2)
 
-        rho1   = np.arctan2(M[1], M[0])
-        rho2   = np.arctan2(N[1], N[0])
-        rho_min = np.min([rho1, rho2], axis=0)
-        rho_max = np.max([rho1, rho2], axis=0)
+            # Distance and angle of G from camera.
+            dist = math.hypot(G[0], G[1])
+            gamma = math.atan2(G[1], G[0])
 
-        # Distance and angle of G from camera.
-        dist = np.linalg.norm(G, axis=0)
-        gamma = np.arctan2(G[1], G[0])
+            # Collect data.
+            ret.append({
+                'dist': dist,        # Distance of rear bumper.
+                'beta': beta,        # Heading of vehicle.
+                'gamma': gamma,      # Heading of rear bumper.
+                'delta1': delta_min, # Leftmost angle of vehicle.
+                'delta2': delta_max, # Rightmost angle of vehicle.
+                'rho1': rho_min,     # Leftmost angle of numberplate.
+                'rho2': rho_max,     # Rightmost angle of numberplate.
+            })
 
-        # Collect data.
-        return [{
-            'dist': dist[i],        # Distance of rear bumper.
-            'beta': beta[i],        # Heading of vehicle.
-            'gamma': gamma[i],      # Heading of rear bumper.
-            'delta1': delta_min[i], # Leftmost angle of vehicle.
-            'delta2': delta_max[i], # Rightmost angle of vehicle.
-            'rho1': rho_min[i],     # Leftmost angle of numberplate.
-            'rho2': rho_max[i],     # Rightmost angle of numberplate.
-        } for i, v in enumerate(candidate_positions)]
+        return ret
 
 class MatchSimulator(object):
     def __init__(self, scenario: Scenario):
