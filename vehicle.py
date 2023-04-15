@@ -70,6 +70,9 @@ class Vehicle(object):
     def __hash__(self):
         return hash(self.numberplate)
 
+    def __repr__(self):
+        return f"Vehicle<{self.numberplate}>"
+
     def change_eid(self):
         self.eid = '%064x' % (self.random.randint(0, 2**256 - 1))
 

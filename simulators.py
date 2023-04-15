@@ -581,10 +581,9 @@ class PerceptionSimulatorV3(object):
             ego.config['length'],ego.config['width'], ego.config['numberplate_width'],
             candidate_positions,
         )
+        for r, v in zip(candidate_lines, candidates): r['vehicle'] = v
 
         # Filter out vehicles that are not in the camera's field of view.
-        for r, v in zip(candidate_lines, candidates):
-            r['vehicle'] = v
         candidate_lines = [r for r in candidate_lines if not (r['delta1'] > self.fov or r['delta2'] < -self.fov)]
 
         # Sort by distance.
