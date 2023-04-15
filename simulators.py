@@ -138,9 +138,15 @@ class Scenario(object):
         [ v.possibly_change_eid() for v in self.vehicles.values()]
         self.match.update_eids()
 
-        # Let position manager to update vehicles' position and update to all vehicles.
+        t1 = time.time()
+
+        # Let position manager to update vehicles' position.
         self.position_manager.update_all_position()
         [v.update_position() for v in self.vehicles.values()]
+
+        t2 = time.time()
+
+        self.perception.update_all_perception()
 
         t3 = time.time()
         
@@ -158,8 +164,10 @@ class Scenario(object):
         # Print out some statistics.
         format_time = lambda dt: "%3.0f ms(%3.0f us)" % (dt * 1000, dt * 1000 * 1000 / len(self.vehicles))
 
-        print("step: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
-            format_time(t3 - t0),
+        print("step: %s; pos: %s; perception: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
+            format_time(t1 - t0),
+            format_time(t2 - t1),
+            format_time(t3 - t2),
             format_time(t4 - t3),
             format_time(t5 - t4),
             format_time(t5 - t0),
@@ -532,6 +540,8 @@ class PerceptionSimulatorV3(object):
 
         self.position_manager = scenario.position_manager
 
+        self.perceived_objects = {}
+
         # Ground truth.
         # Note that one numberplate can have multiple object ids.
         # This happens when a vehicle changes its EID.
@@ -539,7 +549,19 @@ class PerceptionSimulatorV3(object):
         self._gt_objectid_to_eid: List[EID] = []
         self._gt_objectid_to_numberplate: List[NumberPlate] = []
 
+    def update_all_perception(self):
+        ret = []
+        for v in self.vehicles.values():
+            ret.append((v, self._perceive(v)))
+
+        self.perceived_objects = dict(ret)
+
     def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
+        # Return all perceived objects and their positions of the given egovehicle.
+        #return self.perceived_objects.get(ego, [])
+        return self.perceived_objects[ego]
+
+    def _perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
         # Return all perceived objects and their positions of the given egovehicle.
 
         # Ego vehicle's position is the center of front bumper.
