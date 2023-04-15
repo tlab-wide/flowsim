@@ -546,15 +546,23 @@ class PerceptionSimulatorV3(object):
         candidates = self.position_manager.get_nearby_vehicles(camera)
         candidates = [v for v in candidates if v != ego and v.position.distance_to(camera) < self.vision_distance]
 
-        # Filter and project all candidates on a number axis of the camera's viewing angle.
-        candidate_lines = self.get_projected_lines(camera, candidates)
+        # Project all candidates on a number axis of the camera's viewing angle.
+        candidate_positions = [v.position for v in candidates]
+        candidate_lines = self.get_projected_lines_v2(
+            camera,
+            ego.config['length'],ego.config['width'], ego.config['numberplate_width'],
+            candidate_positions,
+        )
 
         # Filter out vehicles that are not in the camera's field of view.
+        for r, v in zip(candidate_lines, candidates):
+            r['vehicle'] = v
         candidate_lines = [r for r in candidate_lines if not (r['delta1'] > self.fov or r['delta2'] < -self.fov)]
 
         # Sort by distance.
         candidate_lines = sorted(candidate_lines, key=lambda r: r['dist'])
 
+        # Filter out vehicles that are occluded by other vehicles.
         candidate_lines = self.get_visible_lines(camera, candidate_lines)
 
         # Filter out vehicles whose numberplates are too skewed.
@@ -594,25 +602,18 @@ class PerceptionSimulatorV3(object):
 
         return ret
 
-    def get_projected_lines(self, camera: Position, candidates: List[Vehicle]) -> List[dict]:
+    def get_projected_lines(self, camera: Position, length: float, width: float, numberplate_width: float, candidate_positions: List[Position]) -> List[dict]:
         # Get projected lines (Vehicle, diagnoal, numberplate) of all vehicles.
         # The lines are projected (straightened) on a number axis, representing the viewing angle [-pi, pi) from the camera.
 
-        if not candidates: return []
+        if not candidate_positions: return []
 
-        x0, y0, beta0 = camera.x, camera.y, camera.heading
-        beta0 = beta0 * math.pi / 180
-
-        # Get the length, width, and numberplate length of all candidates.
-        length = np.array([v.config['length'] for v in candidates], dtype=np.float32)
-        width = np.array([v.config['width'] for v in candidates], dtype=np.float32)
-        numberplate_width = np.array([v.config['numberplate_width'] for v in candidates], dtype=np.float32)
+        x0, y0, beta0 = camera.x, camera.y, camera.heading * math.pi / 180
 
         # Get Position of center of front bumper of all candidates.
-        candidates_front_bumper: List[Position] = [v.position for v in candidates]
-        x = np.array([p.x for p in candidates_front_bumper], dtype=np.float32)
-        y = np.array([p.y for p in candidates_front_bumper], dtype=np.float32)
-        beta = np.array([p.heading for p in candidates_front_bumper], dtype=np.float32) * math.pi / 180
+        x = np.array([p.x for p in candidate_positions], dtype=np.float32)
+        y = np.array([p.y for p in candidate_positions], dtype=np.float32)
+        beta = np.array([p.heading for p in candidate_positions], dtype=np.float32) * math.pi / 180
 
         # Convert the positions to the relative position of camera. The rotation is effectively **-beta0**.
         F = np.array([
@@ -669,15 +670,14 @@ class PerceptionSimulatorV3(object):
 
         # Collect data.
         return [{
-            'vehicle': v,
-            'dist': dist[i],
-            'beta': beta[i],
-            'gamma': gamma[i],
-            'delta1': delta_min[i],
-            'delta2': delta_max[i],
-            'rho1': rho_min[i],
-            'rho2': rho_max[i],
-        } for i, v in enumerate(candidates)]
+            'dist': dist[i],        # Distance of rear bumper.
+            'beta': beta[i],        # Heading of vehicle.
+            'gamma': gamma[i],      # Heading of rear bumper.
+            'delta1': delta_min[i], # Leftmost angle of vehicle.
+            'delta2': delta_max[i], # Rightmost angle of vehicle.
+            'rho1': rho_min[i],     # Leftmost angle of numberplate.
+            'rho2': rho_max[i],     # Rightmost angle of numberplate.
+        } for i, v in enumerate(candidate_positions)]
 
 class MatchSimulator(object):
     def __init__(self, scenario: Scenario):
