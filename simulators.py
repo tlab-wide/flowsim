@@ -51,8 +51,9 @@ class Scenario(object):
             #'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
             'bytes_sent': MetricCollector(format_dir('bytes_sent.json'), self.collect_vehicle_sent_bytes),
 
-            'enqueued_proofs': MetricCollector(format_dir('enqueued_proofs.json'), self.collect_enqueued_proofs),
-            'dropped_proofs': MetricCollector(format_dir('dropped_proofs.json'), self.collect_dropped_proofs),
+            'sent_proofs':     MetricCollector(format_dir('sent_proofs.json'    ), collect_per_vehicle(lambda v: v.n_sent_proofs)),
+            'enqueued_proofs': MetricCollector(format_dir('enqueued_proofs.json'), collect_per_vehicle(lambda v: v.n_enqueued_proofs)),
+            'dropped_proofs':  MetricCollector(format_dir('dropped_proofs.json' ), collect_per_vehicle(lambda v: v.n_dropped_proofs)),
 
             'all_objects':      MetricCollector(format_dir('all_objects.json'     ), collect_per_vehicle(lambda v: len(v.all_objects     ))),
             'local_objects':    MetricCollector(format_dir('local_objects.json'   ), collect_per_vehicle(lambda v: len(v.local_objects   ))),
@@ -225,36 +226,6 @@ class Scenario(object):
                 except (IndexError, KeyError):
                     # IndexError is for gt_objectid_to_numberplate; KeyError is for ret.
                     ret[UNKNOWN_PLATE] += 1
-
-        return ret
-
-    def collect_enqueued_proofs(self) -> VehicleMetric:
-        # Collect how many proofs a vehicle enqueued in this tick.
-        ret = {}
-
-        for v in self.vehicles.values():
-            module = v.get_module(PoTProver)
-            if not module:
-                continue
-            ret[v.numberplate] = module.n_enqueued_proofs
-
-            # XXX: reset n_enqueued_proofs here.
-            module.n_enqueued_proofs = 0
-
-        return ret
-
-    def collect_dropped_proofs(self) -> VehicleMetric:
-        # Collect how many proofs a vehicle dropped in this tick.
-        ret = {}
-
-        for v in self.vehicles.values():
-            module = v.get_module(PoTProver)
-            if not module:
-                continue
-            ret[v.numberplate] = module.n_dropped_proofs
-
-            # XXX: reset n_dropped_proofs here.
-            module.n_dropped_proofs = 0
 
         return ret
 

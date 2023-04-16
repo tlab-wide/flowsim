@@ -66,6 +66,9 @@ class Vehicle(object):
         self.all_objects: Set[ObjectID] = set()
         self.received_objects: Set[ObjectID] = set()
 
+        self.n_sent_proofs: int = 0
+        self.n_enqueued_proofs: int = 0
+        self.n_dropped_proofs: int = 0
 
     def __eq__(lhs, rhs):
         return (

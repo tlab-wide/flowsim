@@ -138,9 +138,6 @@ class PoTProver(VehicleModule):
 
         self.queued_proofs: List[Tuple[int, EID]] = []
 
-        self.n_enqueued_proofs: int = 0
-        self.n_dropped_proofs: int = 0
-
     def update_matches(self):
         # Update match repository against recent unmatched EIDs.
         for s in self.recent_unmatched_eids.data:
@@ -182,7 +179,7 @@ class PoTProver(VehicleModule):
                 if len(self.queued_proofs) >= self.max_queued_proofs:
                     # Drop excessive proofs.
                     droped_objid = self.queued_proofs.pop(0)[0]
-                    self.n_dropped_proofs += 1
+                    self.vehicle.n_dropped_proofs += 1
                     print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate, file=sys.stderr)
 
                 self.queued_proofs.append(proof_entry)
@@ -196,13 +193,15 @@ class PoTProver(VehicleModule):
 
         if enqueued_proofs > 0:
             #print("[%s] %d proofs enqueued" % (self.vehicle.numberplate, enqueued_proofs))
-            self.n_enqueued_proofs += enqueued_proofs
+            self.vehicle.n_enqueued_proofs += enqueued_proofs
 
         # If we have spaces for more proofs, fill them with queued proofs.
         while len(input.proofs) < 8 and len(self.queued_proofs) > 0:
             proof_entry = self.queued_proofs.pop(0)
             input.proofs.append(proof_entry)
             self.recent_sent_proofs.current.add(proof_entry[0])
+
+        self.vehicle.n_sent_proofs = len(input.proofs)
 
         input._objid_to_numberplate = {}
 
