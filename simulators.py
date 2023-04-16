@@ -27,7 +27,7 @@ class Scenario(object):
         self.init_rng()
 
         # Create vehicle repository.
-        self.vehicles: Dict[str, Vehicle] = {}
+        self.vehicles: Dict[NumberPlate, Vehicle] = {}
 
         # Create simulator modules.
         #self.position_manager = PositionManager(self)
@@ -42,18 +42,21 @@ class Scenario(object):
         # Create metric collectors.
         os.makedirs(self.output_dir, exist_ok=True)
         format_dir = lambda x: os.path.join(self.output_dir, x)
+        collect_per_vehicle = lambda func: lambda: {vid: func(v) for vid, v in self.vehicles.items()}
 
         self.metric_collectors = {
-            'latitude': MetricCollector(format_dir('latitude.json'), lambda: {
-                vid: v.position.x for vid, v in self.vehicles.items()
-            }, metric_type = 'vehicle'),
-            'longitude': MetricCollector(format_dir('longitude.json'), lambda: {
-                vid: v.position.y for vid, v in self.vehicles.items()
-            }, metric_type = 'vehicle'),
-            'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
+            'x': MetricCollector(format_dir('x.json'), collect_per_vehicle(lambda v: v.position.x)),
+            'y': MetricCollector(format_dir('y.json'), collect_per_vehicle(lambda v: v.position.y)),
+
+            #'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
             'bytes_sent': MetricCollector(format_dir('bytes_sent.json'), self.collect_vehicle_sent_bytes),
+
             'enqueued_proofs': MetricCollector(format_dir('enqueued_proofs.json'), self.collect_enqueued_proofs),
             'dropped_proofs': MetricCollector(format_dir('dropped_proofs.json'), self.collect_dropped_proofs),
+
+            'all_objects':      MetricCollector(format_dir('all_objects.json'     ), collect_per_vehicle(lambda v: len(v.all_objects     ))),
+            'local_objects':    MetricCollector(format_dir('local_objects.json'   ), collect_per_vehicle(lambda v: len(v.local_objects   ))),
+            'received_objects': MetricCollector(format_dir('received_objects.json'), collect_per_vehicle(lambda v: len(v.received_objects))),
         }
 
         atexit.register(self.cleanup)
@@ -152,8 +155,7 @@ class Scenario(object):
         t3 = time.time()
         
         # Do a tick for every running vehicles.
-        for v in self.vehicles.values():
-            v.do_work()
+        [v.do_work() for v in self.vehicles.values()]
 
         t4 = time.time()
 
@@ -216,7 +218,7 @@ class Scenario(object):
             module = v.get_module(Planner)
             if not module:
                 continue
-            for objid in module.recent_seen_objids():
+            for objid in module.get_recent_seen_objids():
                 try:
                     numberplate = self.perception._gt_objectid_to_numberplate[objid]
                     ret[numberplate] += 1
@@ -255,46 +257,6 @@ class Scenario(object):
             module.n_dropped_proofs = 0
 
         return ret
-
-    def collect_prover_matches(self) -> VehicleMetric:
-        # Collect how many match entries of a given prover.
-
-        ret = {}
-
-        for v in self.vehicles.values():
-            module = v.get_module(Prover)
-            if not module:
-                continue
-            ret[v.numberplate] = len(module._numberplate_to_eid)
-
-        return ret
-
-    def collect_prover_unmatched_eids(self) -> VehicleMetric:
-        # Collect how many unmatched eids of a given prover.
-
-        ret = {}
-
-        for v in self.vehicles.values():
-            module = v.get_module(Prover)
-            if not module:
-                continue
-            ret[v.numberplate] = len(module.unmatched_eids)
-
-        return ret
-
-    def collect_prover_known_numberplates(self) -> VehicleMetric:
-        # Collect how many known numberplates of a given prover.
-
-        ret = {}
-
-        for v in self.vehicles.values():
-            module = v.get_module(Prover)
-            if not module:
-                continue
-            ret[v.numberplate] = len(module.known_numberplates)
-
-        return ret
-
 
 class PositionManager(object):
     def __init__(self, scenario: Scenario):

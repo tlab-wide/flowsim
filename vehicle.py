@@ -61,6 +61,12 @@ class Vehicle(object):
         flow_targets = set(sum(self._data_flow_map.values(), []))
         self._source_modules = [i[0] for i in data_flow if i[0] not in flow_targets]
 
+        # Metrics.
+        self.local_objects: Set[ObjectID] = set()
+        self.all_objects: Set[ObjectID] = set()
+        self.received_objects: Set[ObjectID] = set()
+
+
     def __eq__(lhs, rhs):
         return (
             lhs.__class__ == rhs.__class__ and 

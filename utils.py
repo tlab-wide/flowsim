@@ -25,27 +25,17 @@ NumberPlate = str
 EID = str
 Proof = bytes
 Pubkey = bytes
+ObjectID = int
 
 # Define metric types.
 VehicleMetric = Dict[NumberPlate, float]
 GlobalMetric = float
 
 class MetricCollector:
-    def __init__(self, filename: str, collect_function: Callable[[], Union[GlobalMetric, VehicleMetric]], metric_type: str = None):
+    def __init__(self, filename: str, collect_function: Callable[[], Union[GlobalMetric, VehicleMetric]]):
         self.filename = filename
         self.collect_function = collect_function
         self.file = open(filename, 'w')
-
-        # Check which type of metric is being collected.
-        if metric_type is None:
-            # Infer metric type from return type of collect_function.
-            if collect_function.__annotations__['return'] == GlobalMetric:
-                metric_type = 'global'
-            elif collect_function.__annotations__['return'] == VehicleMetric:
-                metric_type = 'vehicle'
-            else:
-                raise TypeError('Invalid metric type.')
-        self.metric_type = metric_type
 
         self.data = None
 
@@ -155,9 +145,9 @@ class SegmentTree:
 @dataclasses.dataclass
 class CPM(object):
     sender: EID
-    perceived_objects: List[Tuple[int, Position]] = dataclasses.field(default_factory=lambda: [])
-    proofs: List[Tuple[int, Proof]] = dataclasses.field(default_factory=lambda: [])
-    _objid_to_numberplate: Dict[int, NumberPlate] = dataclasses.field(default_factory=lambda: {})
+    perceived_objects: List[Tuple[ObjectID, Position]] = dataclasses.field(default_factory=lambda: [])
+    proofs: List[Tuple[ObjectID, Proof]] = dataclasses.field(default_factory=lambda: [])
+    _objid_to_numberplate: Dict[ObjectID, NumberPlate] = dataclasses.field(default_factory=lambda: {})
     _gt_is_fake: bool = False
 
     def verify(self):

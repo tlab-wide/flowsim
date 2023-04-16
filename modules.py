@@ -26,15 +26,13 @@ class VehicleModule(metaclass=abc.ABCMeta):
 
 class LocalPerception(VehicleModule):
     # Local perception module
-
     def do_work(self, input: None) -> CPM:
         assert input == None, f"Module {self.__class__.__name__} requires no input."
 
         new_objects = self.vehicle.scenario.perception.perceive(self.vehicle)
-        
-        #if new_objects: 
-        #    print("[%s] Objects: %s" % (self.vehicle.numberplate, new_objects))
 
+        self.vehicle.local_objects.update([i[0] for i in new_objects])
+        
         if len(new_objects) > 128:
             # TODO: we need a queue.
             raise NotImplementedError
@@ -50,19 +48,19 @@ class Planner(VehicleModule):
 
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
-
         self.recent_seen_objects = RingBuffer(10, lambda: set())
 
     def do_work(self, input: CPM) -> None:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
-        for objid, pos in input.perceived_objects:
-            self.recent_seen_objects.current.add(objid)
+        objids = [i[0] for i in input.perceived_objects]
+        self.recent_seen_objects.current.update(objids)
+        self.vehicle.all_objects.update(objids)
 
         return None
 
-    def recent_seen_objids(self) -> Set[int]:
-        return functools.reduce(lambda x, y: x.union(y), self.recent_seen_objects.data, set())
+    def get_recent_seen_objids(self) -> Set[int]:
+        return set.union(self.recent_seen_objects.data)
 
     def flush(self) -> None:
         # Renew the recent_seen_objects.
@@ -72,7 +70,12 @@ class CPSReceiver(VehicleModule):
     def do_work(self, input: None) -> List[CPM]:
         assert input == None, f"Module {self.__class__.__name__} requires no input."
 
-        return self.vehicle.scenario.network.receive(self.vehicle)
+        cpms = self.vehicle.scenario.network.receive(self.vehicle)
+
+        for cpm in cpms:
+            self.vehicle.received_objects.update([i[0] for i in cpm.perceived_objects])
+
+        return cpms
 
 class CPSSender(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
@@ -110,7 +113,6 @@ class CPSSender(VehicleModule):
 # =============================================================================
 
 class PoTProver(VehicleModule):
-
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
 
