@@ -1,4 +1,5 @@
 
+import sys
 import abc
 import copy
 import functools
@@ -182,7 +183,7 @@ class PoTProver(VehicleModule):
                     # Drop excessive proofs.
                     droped_objid = self.queued_proofs.pop(0)[0]
                     self.n_dropped_proofs += 1
-                    print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate)
+                    print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate, file=sys.stderr)
 
                 self.queued_proofs.append(proof_entry)
                 enqueued_proofs += 1
