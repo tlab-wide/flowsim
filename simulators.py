@@ -1,15 +1,10 @@
 
 from typing import *
-import dataclasses
 import atexit
-import abc
-import numpy as np
-import math
-
-import traci
 import math
 import time
 
+import traci
 from vehicle import *
 from modules import *
 from utils import *
@@ -30,7 +25,6 @@ class Scenario(object):
         self.vehicles: Dict[NumberPlate, Vehicle] = {}
 
         # Create simulator modules.
-        #self.position_manager = PositionManager(self)
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
         #self.perception = PerceptionSimulator(self)
@@ -97,10 +91,7 @@ class Scenario(object):
         print("Initialized sumo with end time: %s" % self.end_time)
 
     def cleanup(self):
-        self.collect_final_metrics()
-
-        for mc in self.metric_collectors.values():
-            mc.save()
+        [mc.save() for mc in self.metric_collectors.values()]
 
         self.traci.close()
 
@@ -121,50 +112,39 @@ class Scenario(object):
 
     def tick(self):
         t0 = time.time()
-
         # Run one traci step first.
         self.traci.simulationStep()
 
         self.now = traci.simulation.getTime()
-        if self.now >= self.end_time:
-            raise StopIteration
+        if self.now >= self.end_time: raise StopIteration
 
         # Update vehicle list from traci.
         for vid in self.traci.simulation.getDepartedIDList():
             if vid not in self.vehicles:
                 self.vehicles[vid] = self.generate_vehicle(vid)
-                #print("New %s: %s" % (self.vehicles[vid].__class__.__name__, vid))
 
         for vid in self.traci.simulation.getArrivedIDList():
-            #self.vehicles[vid].stop()
             del self.vehicles[vid]
 
         # Give vehicles chance to thange their EIDs and let match simulator know.
-        [ v.possibly_change_eid() for v in self.vehicles.values()]
-        self.match.update_eids()
+        if any([v.possibly_change_eid() for v in self.vehicles.values()]):
+            self.match.update_eids()
 
         t1 = time.time()
-
         # Let position manager to update vehicles' position.
         self.position_manager.update_all_position()
         [v.update_position() for v in self.vehicles.values()]
 
         t2 = time.time()
-
         self.perception.update_all_perception()
 
         t3 = time.time()
-        
-        # Do a tick for every running vehicles.
         [v.do_work() for v in self.vehicles.values()]
 
         t4 = time.time()
-
-        # Collect metrics from all vehicles.
         [i.collect() for i in self.metric_collectors.values()]
 
         t5 = time.time()
-
         # Print out some statistics.
         format_time = lambda dt: "%3.0f ms(%3.0f us)" % (dt * 1000, dt * 1000 * 1000 / len(self.vehicles))
         log_ = "step: %s; pos: %s; perception: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
@@ -178,22 +158,11 @@ class Scenario(object):
             len(self.vehicles),
         )
 
+        self.i += 1
         if self.i % 10 == 0:
             print(log_)
 
-        self.i += 1
-
-    def collect_final_metrics(self):
-        # Collect final metrics from all vehicles.
-        pass
-
-    def set_vehicle_color(self, vid: str, color: Tuple[int, int, int, int]):
-        # Set vehicle color if gui is enabled.
-        if self.use_gui:
-            self.traci.vehicle.setColor(vid, color)
-
     # Metric collectors.
-
     def collect_vehicle_sent_bytes(self) -> VehicleMetric:
         # Collect how many bytes a vehicle sent in this tick.
         ret = dict((id, 0) for id in self.vehicles.keys())
@@ -228,44 +197,6 @@ class Scenario(object):
                     ret[UNKNOWN_PLATE] += 1
 
         return ret
-
-class PositionManager(object):
-    def __init__(self, scenario: Scenario):
-        self.scenario = scenario
-        self.vehicles = scenario.vehicles
-        self.traci = scenario.traci
-        self.config = scenario.config['position_manager']
-        self.range_limit = self.config['range_limit']
-
-        # TODO: naive implementation here.
-        # TODO: thread safety.
-        self._position: Dict[Vehicle, Position] = {}
-
-    def get_nearby_vehicles(self, position: Position) -> List[Vehicle]:
-        # TODO: O(N) implementation.
-        ret = []
-
-        for v, pos in self._position.items():
-            if (pos - position).to_polar()[0] < self.range_limit:
-                ret.append(v)
-
-        return ret
-
-    def get_vehicle_position(self, vehicle: Vehicle) -> Position:
-        return self._position[vehicle]
-
-    def update_all_position(self):
-        # Set vehicles' positions to the data at the given tick.
-        self._position = {}
-
-        for numberplate, v in self.vehicles.items():
-            x, y = self.traci.vehicle.getPosition(numberplate)
-            yaw  = self.traci.vehicle.getAngle(numberplate)
-
-            # Warning: getAngle returns yaw (0 for North, 90 for East, etc.)
-            # Need to convert it to theta (0 for East, 90 for North, etc.)
-            theta = (360 + 90 - yaw) % 360
-            self._position[v] = Position(x, y, theta)
 
 class PositionManagerV2(object):
     def __init__(self, scenario: Scenario):
@@ -308,7 +239,6 @@ class PositionManagerV2(object):
         ret = []
 
         for ego, position in self._position.items():
-
             # Offset by two since the grid is padded.
             grid_x = math.floor(position.x / self.range_limit) + 2
             grid_y = math.floor(position.y / self.range_limit) + 2
@@ -322,6 +252,7 @@ class PositionManagerV2(object):
 
             # Filter out ego and vehicles > range_limit away.
             results = [v for v in candidates if self._position[v].distance_to(position) < self.range_limit and v != ego]
+
             ret.append((position, results))
 
         self._nearby_vehicles = dict(ret)
@@ -339,8 +270,6 @@ class PositionManagerV2(object):
         result = self.traci.vehicle.getAllSubscriptionResults()
 
         for numberplate, v in self.vehicles.items():
-            #x, y = self.traci.vehicle.getPosition(numberplate)
-            #yaw  = self.traci.vehicle.getAngle(numberplate)
             x, y = result[numberplate][traci.constants.VAR_POSITION]
             yaw  = result[numberplate][traci.constants.VAR_ANGLE]
 
@@ -351,10 +280,7 @@ class PositionManagerV2(object):
 
         # TODO: Do we need to unsubscribe vehicles that are no longer in the simulation?
 
-        # Update the grid.
         self._update_grid()
-
-        # Update the results.
         self._update_nearby()
 
     def _update_grid(self):
@@ -377,7 +303,6 @@ class PositionManagerV2(object):
 class NetworkSimulator(object):
     # Network simulator.
     # Currently a hand-crafted (dummy) implementation is used.
-
     def __init__(self, scenario: Scenario):
         self.scenario = scenario
         self.vehicles = scenario.vehicles
@@ -394,7 +319,6 @@ class NetworkSimulator(object):
 
     def broadcast(self, sender: Vehicle, message: object) -> int:
         # Broadcast a message to vehicles in range and return number of receipents.
-        #print("[%s] Broadcasting message %s" % (sender.numberplate, message))
 
         # Accumulate number of bytes sent.
         self.bytes_sent[sender] = self.bytes_sent.get(sender, 0) + len(message)
@@ -416,56 +340,6 @@ class NetworkSimulator(object):
         # Pop a vehicle's receive buffer.
         ret = self.receive_buffers.get(receiver, [])
         self.receive_buffers[receiver] = []
-
-        return ret
-
-class PerceptionSimulator(object):
-    def __init__(self, scenario: Scenario):
-        self.scenario = scenario
-        self.vehicles = scenario.vehicles
-        self.random = random_from(scenario.random)
-        self.config = scenario.config['perception_simulator']
-        self.vision_distance = self.config['vision_distance']
-        self.vision_angle = abs(self.config['vision_angle'])
-
-        self.position_manager = scenario.position_manager
-
-        # Ground truth.
-        # Note that one numberplate can have multiple object ids.
-        # This happens when a vehicle changes its EID.
-        self._gt_eid_to_objectid: Dict[EID, int] = {}
-        self._gt_objectid_to_eid: List[EID] = []
-        self._gt_objectid_to_numberplate: List[NumberPlate] = []
-
-
-    def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
-        # Return all perceived objects and their positions of the given egovehicle.
-        candidates = self.position_manager.get_nearby_vehicles(ego.position)
-
-        ret = []
-
-        for v in candidates:
-            if v == ego: continue # Don't count self.
-
-            distance, angle = (v.position - ego.position).to_polar()
-            # Do not use > here since it may be nan.
-            if (
-                distance < self.vision_distance and 
-                abs(ego.position.heading - angle) < self.vision_angle
-            ):
-
-                # Record the ground truth if not already.
-                # Object ID will be automatically assigned.
-                if v.eid not in self._gt_eid_to_objectid:
-                    self._gt_eid_to_objectid[v.eid] = len(self._gt_objectid_to_eid)
-                    self._gt_objectid_to_eid.append(v.eid)
-                    self._gt_objectid_to_numberplate.append(v.numberplate)
-
-                ret.append((
-                    self._gt_eid_to_objectid[v.eid],
-                    v.position,
-                    v.numberplate,
-                ))
 
         return ret
 
@@ -500,7 +374,6 @@ class PerceptionSimulatorV3(object):
 
     def perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
         # Return all perceived objects and their positions of the given egovehicle.
-        #return self.perceived_objects.get(ego, [])
         return self.perceived_objects[ego]
 
     def _perceive(self, ego: Vehicle) -> List[Tuple[int, Position, NumberPlate]]:
@@ -543,19 +416,18 @@ class PerceptionSimulatorV3(object):
                 self._gt_objectid_to_eid.append(v.eid)
                 self._gt_objectid_to_numberplate.append(v.numberplate)
 
-        return [
-            (self._gt_eid_to_objectid[r['vehicle'].eid], r['vehicle'].position, r['vehicle'].numberplate)
-        for r in candidate_lines]
+        return [(
+            self._gt_eid_to_objectid[r['vehicle'].eid],
+            r['vehicle'].position,
+            r['vehicle'].numberplate,
+        ) for r in candidate_lines]
 
     def get_visible_lines(self, camera: Position, candidate_lines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         # Calculate occlusion and return the visible vehicles in projection format.
         # The returned list is sorted by the distance to the camera.
-
         if not candidate_lines: return []
 
-        all_points = sum([
-            [i['delta1'], i['delta2'], i['rho1'], i['rho2']]
-        for i in candidate_lines], [])
+        all_points = sum([[i['delta1'], i['delta2'], i['rho1'], i['rho2']] for i in candidate_lines], [])
         tree = SegmentTree(all_points)
 
         ret = [candidate_lines[0]]
@@ -570,7 +442,6 @@ class PerceptionSimulatorV3(object):
     def get_projected_lines(self, camera: Position, length: float, width: float, numberplate_width: float, candidate_positions: List[Position]) -> List[dict]:
         # Get projected lines (Vehicle, diagnoal, numberplate) of all vehicles.
         # The lines are projected (straightened) on a number axis, representing the viewing angle [-pi, pi) from the camera.
-
         if not candidate_positions: return []
 
         x0, y0, beta0 = camera.x, camera.y, camera.heading * math.pi / 180
@@ -579,14 +450,12 @@ class PerceptionSimulatorV3(object):
         ret = []
         for i in candidate_positions:
             # Get Position of center of front bumper of all candidates.
-            # Convert the positions to the relative position of camera. The rotation is effectively **-beta0**.
+            # Convert the positions and headings to the relative position of camera. The rotation is effectively **-beta0**.
             x, y, beta = i.x, i.y, i.heading * math.pi / 180
             F = (
                  cosbeta0 * (x - x0) + sinbeta0 * (y - y0),
                 -sinbeta0 * (x - x0) + cosbeta0 * (y - y0),
             )
-
-            # Convert the headings to the relative position of camera.
             beta -= beta0
 
             # ========================================
@@ -656,15 +525,10 @@ class MatchSimulator(object):
     def update_eids(self):
         # Update EIDs of all vehicles.
         # Only keep the latest EID of each vehicle.
-
-        self.eid_to_numberplate = dict(
-            (v.eid, v.numberplate) for v in self.vehicles.values()
-        )
+        self.eid_to_numberplate = {v.eid: vid for vid, v in self.vehicles.items()}
 
     def match_eid(self, known_numberplates: Set[NumberPlate], eid: EID) -> NumberPlate:
         # Match a EID to a numberplate in candidates.
         # Return the number plate if found, otherwise return None.
-        if self.eid_to_numberplate.get(eid, None) in known_numberplates:
-            return self.eid_to_numberplate[eid]
-        return None
-
+        ret = self.eid_to_numberplate.get(eid, None)
+        return ret if ret in known_numberplates else None

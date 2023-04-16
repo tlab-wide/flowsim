@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 import math
 import random
-import json
-import numpy as np
+import dataclasses
 from typing import *
 
 if 'SUMO_HOME' in os.environ:
@@ -17,8 +17,6 @@ else:
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
 import traci
-import dataclasses
-
 
 # Define types.
 NumberPlate = str
@@ -36,7 +34,6 @@ class MetricCollector:
         self.filename = filename
         self.collect_function = collect_function
         self.file = open(filename, 'w')
-
         self.data = None
 
     def collect(self) -> None:
@@ -60,31 +57,18 @@ def random_from(parent: Union[random.Random, int]) -> random.Random:
 class Position(object):
     x: float
     y: float
-    heading: float = np.nan
+    heading: float = math.nan
     HASH_ACCURACY_DECIMAL: int = 2
 
     def __sub__(p1: Position, p2: Position) -> Position:
-        # x, y: p2 - p1
-        # heading: nan
-        return Position(p1.x - p2.x, p1.y - p2.y, np.nan)
-
-    def to_polar(self) -> Tuple[float, float]:
-        # Convert point (x, y) to polar coordinates (r, theta).
-        # theta is in range [0, 360).
-        return (
-            math.hypot(self.x, self.y),
-            (math.atan2(self.y, self.x) / math.pi * 180 + 360) % 360
-        )
+        # x, y: p2 - p1; heading: nan
+        return Position(p1.x - p2.x, p1.y - p2.y, math.nan)
 
     def angle_to(self, other: Position) -> float:
         return (math.atan2(other.y - self.y, other.x - self.x) / math.pi * 180 + 360) % 360
-        #return (other - self).to_polar()[1]
-
 
     def distance_to(self, other: Position) -> float:
         return math.hypot(other.x - self.x, other.y - self.y)
-        #return (other - self).to_polar()[0]
-
 
     def __hash__(self: Position):
         return (
@@ -141,7 +125,6 @@ class SegmentTree:
     def query(self, start, end):
         return self._query(self.root, self.mapping[start], self.mapping[end])
 
-
 @dataclasses.dataclass
 class CPM(object):
     sender: EID
@@ -176,7 +159,6 @@ class CPM(object):
 
     def __add__(self, other: CPM):
         # Merge two CPMs.
-
         assert self.sender == other.sender
         assert self._objid_to_numberplate == other._objid_to_numberplate == {}
 
@@ -200,8 +182,7 @@ def pot_pubkey(proof: Proof, salt: EID) -> Pubkey:
     # XXX: Dummy implementation atm.
     eid, plate, salt_ = proof.decode().split('#')
 
-    if salt != salt_:
-        return None
+    if salt != salt_: return None
 
     return f"{eid}#{plate}".encode()
 
@@ -224,4 +205,3 @@ class RingBuffer:
         if new_data == None:
             new_data = self.default_factory()
         self.data = [new_data] + self.data[:-1]
-

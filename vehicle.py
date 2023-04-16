@@ -15,7 +15,7 @@ class Vehicle(object):
     config: dict
     random: random.Random = random
 
-    position: Position = Position(np.nan, np.nan, np.nan)
+    position: Position = Position(math.nan, math.nan, math.nan)
     eid: EID = None
     
     # Define modules and data flow by adjacent table.
@@ -71,10 +71,7 @@ class Vehicle(object):
         self.n_dropped_proofs: int = 0
 
     def __eq__(lhs, rhs):
-        return (
-            lhs.__class__ == rhs.__class__ and 
-            lhs.numberplate == rhs.numberplate
-        )
+        return lhs.__class__ == rhs.__class__ and lhs.numberplate == rhs.numberplate
 
     def __hash__(self):
         return hash(self.numberplate)
@@ -88,6 +85,9 @@ class Vehicle(object):
     def possibly_change_eid(self):
         if self.random.random() < self.config['eid_changing_possibility']:
             self.change_eid()
+            return True
+
+        return False
 
     def update_position(self):
         self.position = self.scenario.position_manager.get_vehicle_position(self)
@@ -97,18 +97,15 @@ class Vehicle(object):
 
     def do_work(self):
         # Flow the actual modules.
-
         def _dfs(module_class, input):
             module = self.get_module(module_class)
             output = module.do_work(input)
 
             # Break dfs if the current module produces no output.
-            if output == None:
-                return
+            if output == None: return
 
             # Handle list of output as well.
-            if type(output) != list:
-                output = [output]
+            if type(output) != list: output = [output]
 
             for o in output:
                 assert isinstance(o, CPM), \
@@ -117,14 +114,11 @@ class Vehicle(object):
                 for target in self._data_flow_map[module_class]:
                     _dfs(target, o)
 
-
-        for i in self._source_modules:
-            # DFS into the module flow tree.
-            _dfs(i, None)
+        # DFS into the module flow tree.
+        [_dfs(i, None) for i in self._source_modules]
 
         # Flush all modules.
-        for i in self._module_instance_map.values():
-            i.flush()
+        [i.flush() for i in self._module_instance_map.values()]
 
 # =========================================
 #   Definition of different vehicle types

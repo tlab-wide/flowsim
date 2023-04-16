@@ -1,16 +1,12 @@
 
 import sys
 import abc
-import copy
-import functools
 import dataclasses
 
 from utils import *
-import utils
 
 class VehicleModule(metaclass=abc.ABCMeta):
     # A module in a Vehicle 
-
     def __init__(self, vehicle: 'Vehicle'):
         self.vehicle = vehicle
 
@@ -46,7 +42,6 @@ class LocalPerception(VehicleModule):
 
 class Planner(VehicleModule):
     # Planning module
-
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
         self.recent_seen_objects = RingBuffer(10, lambda: set())
@@ -97,17 +92,13 @@ class CPSSender(VehicleModule):
 
     def flush(self) -> None:
         # Join all CPMs generated in this tick and flush it to the network.
-
         cpm = sum(self.cpms_to_send, CPM(sender=self.vehicle.eid))
         cpm.verify()
         self.cpms_to_send = []
 
-        # Do not send empty CPMs.
-        if len(cpm.perceived_objects) == 0 and len(cpm.proofs) == 0:
-            return
+        if len(cpm.perceived_objects) == 0 and len(cpm.proofs) == 0: return
 
         self.vehicle.scenario.network.broadcast(self.vehicle, cpm)
-
 
 # =============================================================================
 #                                 PoT modules
@@ -158,8 +149,6 @@ class PoTProver(VehicleModule):
 
     def generate_proofs(self, input: CPM) -> CPM:
         # Generate proofs for all matched vehicles in the given CPM.
-
-        enqueued_proofs = 0
         for objid, pos in input.perceived_objects:
             numberplate = input._objid_to_numberplate[objid]
             eid = self._numberplate_to_eid.get(numberplate, None)
@@ -169,7 +158,6 @@ class PoTProver(VehicleModule):
 
             if any(numberplate in i for i in self.recent_sent_proofs.data):
                 # Do not send duplicate proofs.
-                #print("skip duplicate proof for objid", objid)
                 continue
 
             proof_entry = (objid, pot_proof(numberplate, eid, self.vehicle.eid))
@@ -177,23 +165,19 @@ class PoTProver(VehicleModule):
             if len(input.proofs) >= 8:
                 # Queue excessive proofs.
                 if len(self.queued_proofs) >= self.max_queued_proofs:
-                    # Drop excessive proofs.
+                    # Drop the oldest proof if queue is full.
                     droped_objid = self.queued_proofs.pop(0)[0]
                     self.vehicle.n_dropped_proofs += 1
                     print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate, file=sys.stderr)
 
                 self.queued_proofs.append(proof_entry)
-                enqueued_proofs += 1
+                self.vehicle.n_enqueued_proofs += 1
                 continue
 
             input.proofs.append(proof_entry)
 
             # Record proofs sent in this tick.
             self.recent_sent_proofs.current.add(numberplate)
-
-        if enqueued_proofs > 0:
-            #print("[%s] %d proofs enqueued" % (self.vehicle.numberplate, enqueued_proofs))
-            self.vehicle.n_enqueued_proofs += enqueued_proofs
 
         # If we have spaces for more proofs, fill them with queued proofs.
         while len(input.proofs) < 8 and len(self.queued_proofs) > 0:
@@ -211,8 +195,7 @@ class PoTProver(VehicleModule):
         # Hear from a vehicle.
 
         # If the sender is matched, do nothing.
-        if e in self._eid_to_numberplate:
-            return
+        if e in self._eid_to_numberplate: return
 
         # Try match it against known numberplates.
         n = self.vehicle.scenario.match.match_eid(self.known_numberplates, e)
@@ -252,11 +235,9 @@ class PoTProver(VehicleModule):
 
 class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
-
         super().__init__(vehicle)
 
         self.pubkey_to_provers: Dict[Pubkey, set] = {}
-
         self._unconfirmed_objects: Dict[int, Position] = {}
 
     def do_work(self, input: CPM) -> CPM:
@@ -266,13 +247,12 @@ class PoTVerifier(VehicleModule):
         self.stage_objects(input, objid_to_pubkey)
         return self.generate_cpm(input, objid_to_pubkey)
 
-
     def update_provers(self, input: CPM) -> None:
         # Generate pubkey from proofs and store them.
         # TODO: limit the number of unmatched proofs per sender.
         objid_to_pubkey: Dict[int, Pubkey] = {}
         for objid, p in input.proofs:
-            pubkey = utils.pot_pubkey(p, input.sender)
+            pubkey = pot_pubkey(p, input.sender)
 
             if pubkey == None:
                 # It is not a valid proof.
@@ -321,7 +301,6 @@ class PoTVerifier(VehicleModule):
 #                              Attacker modules
 # =============================================================================
 
-
 class CPSSpammer(VehicleModule):
     def do_work(self, input: None) -> CPM:
         assert input == None, f"Module {self.__class__.__name__} requires no input."
@@ -329,17 +308,14 @@ class CPSSpammer(VehicleModule):
         random = self.vehicle.random
         pos = self.vehicle.position
 
-        objects = [
-            (
-                random.randint(0, 10000),
-                Position(
-                    pos.x + random.randint(-100, 100),
-                    pos.y + random.randint(-100, 100),
-                    random.random() * 360,
-                ),
-            )
-            for i in range(random.randint(0, 32))
-        ]
+        objects = [(
+            random.randint(0, 10000),
+            Position(
+                pos.x + random.randint(-100, 100),
+                pos.y + random.randint(-100, 100),
+                random.random() * 360,
+            ),
+        ) for i in range(random.randint(0, 32))]
 
         return CPM(self.vehicle.eid, objects, _gt_is_fake = True)
 

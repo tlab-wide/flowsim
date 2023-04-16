@@ -2,16 +2,12 @@
 
 import sys
 import yaml
-from typing import *
 
-from vehicle import *
-from simulators import *
-from modules import *
-from utils import *
+import simulators
 
 def main():
     config = yaml.safe_load(open(sys.argv[1], 'rb'))
-    scenario = Scenario(config)
+    scenario = simulators.Scenario(config)
 
     while True:
         try:
@@ -19,10 +15,7 @@ def main():
         except StopIteration:
             break
 
-    scenario.collect_final_metrics()
-
     scenario.cleanup()
-    
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
