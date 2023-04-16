@@ -158,6 +158,8 @@ class PoTProver(VehicleModule):
 
     def generate_proofs(self, input: CPM) -> CPM:
         # Generate proofs for all matched vehicles in the given CPM.
+
+        enqueued_proofs = 0
         for objid, pos in input.perceived_objects:
             numberplate = input._objid_to_numberplate[objid]
             eid = self._numberplate_to_eid.get(numberplate, None)
@@ -180,15 +182,19 @@ class PoTProver(VehicleModule):
                     self.n_dropped_proofs += 1
                     print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate)
 
-                print("[%s] queue proof for %s" % (self.vehicle.numberplate, numberplate))
+                #print("[%s] queue proof for %s" % (self.vehicle.numberplate, numberplate))
                 self.queued_proofs.append(proof_entry)
-                self.n_enqueued_proofs += 1
+                enqueued_proofs += 1
                 continue
 
             input.proofs.append(proof_entry)
 
             # Record proofs sent in this tick.
             self.recent_sent_proofs.current.add(numberplate)
+
+        if enqueued_proofs > 0:
+            print("[%s] %d proofs enqueued" % (self.vehicle.numberplate, enqueued_proofs))
+            self.n_enqueued_proofs += enqueued_proofs
 
         # If we have spaces for more proofs, fill them with queued proofs.
         while len(input.proofs) < 8 and len(self.queued_proofs) > 0:

@@ -37,6 +37,8 @@ class Scenario(object):
         self.perception = PerceptionSimulatorV3(self)
         self.match = MatchSimulator(self)
 
+        self.i = 0
+
         # Create metric collectors.
         os.makedirs(self.output_dir, exist_ok=True)
         format_dir = lambda x: os.path.join(self.output_dir, x)
@@ -114,7 +116,6 @@ class Scenario(object):
         return ret
 
     def tick(self):
-
         t0 = time.time()
 
         # Run one traci step first.
@@ -163,8 +164,7 @@ class Scenario(object):
 
         # Print out some statistics.
         format_time = lambda dt: "%3.0f ms(%3.0f us)" % (dt * 1000, dt * 1000 * 1000 / len(self.vehicles))
-
-        print("step: %s; pos: %s; perception: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
+        log_ = "step: %s; pos: %s; perception: %s; work: %s; coll: %s; total: %s; tick: %.0f; #vehicles: %d" % (
             format_time(t1 - t0),
             format_time(t2 - t1),
             format_time(t3 - t2),
@@ -173,7 +173,12 @@ class Scenario(object):
             format_time(t5 - t0),
             self.now,
             len(self.vehicles),
-        ))
+        )
+
+        if self.i % 10 == 0:
+            print(log_)
+
+        self.i += 1
 
     def collect_final_metrics(self):
         # Collect final metrics from all vehicles.
