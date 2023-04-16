@@ -184,7 +184,6 @@ class PoTProver(VehicleModule):
                     self.n_dropped_proofs += 1
                     print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate)
 
-                #print("[%s] queue proof for %s" % (self.vehicle.numberplate, numberplate))
                 self.queued_proofs.append(proof_entry)
                 enqueued_proofs += 1
                 continue
@@ -195,7 +194,7 @@ class PoTProver(VehicleModule):
             self.recent_sent_proofs.current.add(numberplate)
 
         if enqueued_proofs > 0:
-            print("[%s] %d proofs enqueued" % (self.vehicle.numberplate, enqueued_proofs))
+            #print("[%s] %d proofs enqueued" % (self.vehicle.numberplate, enqueued_proofs))
             self.n_enqueued_proofs += enqueued_proofs
 
         # If we have spaces for more proofs, fill them with queued proofs.

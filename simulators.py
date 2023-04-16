@@ -45,8 +45,8 @@ class Scenario(object):
         collect_per_vehicle = lambda func: lambda: {vid: func(v) for vid, v in self.vehicles.items()}
 
         self.metric_collectors = {
-            'x': MetricCollector(format_dir('x.json'), collect_per_vehicle(lambda v: v.position.x)),
-            'y': MetricCollector(format_dir('y.json'), collect_per_vehicle(lambda v: v.position.y)),
+            'x': MetricCollector(format_dir('x.json'), collect_per_vehicle(lambda v: "%.3f" % v.position.x)),
+            'y': MetricCollector(format_dir('y.json'), collect_per_vehicle(lambda v: "%.3f" % v.position.y)),
 
             #'recent_saw_by': MetricCollector(format_dir('recent_saw_by.json'), self.collect_recent_saw_by),
             'bytes_sent': MetricCollector(format_dir('bytes_sent.json'), self.collect_vehicle_sent_bytes),
