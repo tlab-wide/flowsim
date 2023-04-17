@@ -504,9 +504,9 @@ class PerceptionSimulatorV3(object):
 
             # Collect data.
             ret.append({
-                'dist': dist,        # Distance of rear bumper.
+                'dist': dist,        # Distance to the center rear bumper.
                 'beta': beta,        # Heading of vehicle.
-                'gamma': gamma,      # Heading of rear bumper.
+                'gamma': gamma,      # Angle of the center of rear bumper.
                 'delta1': delta_min, # Leftmost angle of vehicle.
                 'delta2': delta_max, # Rightmost angle of vehicle.
                 'rho1': rho_min,     # Leftmost angle of numberplate.

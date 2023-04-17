@@ -28,15 +28,15 @@ network_simulator:
   v2v_pdr: 0.95
 
 perception_simulator:
-  vision_distance: 80 # meters
-  fov: 60 # degrees (of one side)
+  vision_distance: 40 # meters
+  fov: 45 # degrees (of one side)
   target_max_rotation: 60 # degrees (of one side)
 
 vehicle:
   width: 1.84
   length: 4.88
   numberplate_width: 0.35
-  eid_changing_possibility: 0.0001
+  eid_changing_possibility: 0.000023148148148 # 1 / 43200
   pot_verifier_max_unverified_per_vehicle: 20
 
   PoTProver:
