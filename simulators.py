@@ -27,7 +27,6 @@ class Scenario(object):
         # Create simulator modules.
         self.position_manager = PositionManagerV2(self)
         self.network = NetworkSimulator(self)
-        #self.perception = PerceptionSimulator(self)
         self.perception = PerceptionSimulatorV3(self)
         self.match = MatchSimulator(self)
 
@@ -83,7 +82,7 @@ class Scenario(object):
     def init_sumo(self):
         sumo_bin = 'sumo-gui' if self.use_gui else 'sumo'
 
-        self.traci.start([sumo_bin, "-c", self.config['sumo_config_path']])
+        self.traci.start([sumo_bin, "--no-warnings", "true", "-c", self.config['sumo_config_path']])
 
         self.now = self.traci.simulation.getTime()
         self.end_time = self.traci.simulation.getEndTime()
@@ -110,7 +109,7 @@ class Scenario(object):
 
         return ret
 
-    def tick(self):
+    def tick(self, preheat = False):
         t0 = time.time()
         # Run one traci step first.
         self.traci.simulationStep()
@@ -119,12 +118,15 @@ class Scenario(object):
         if self.now >= self.end_time: raise StopIteration
 
         # Update vehicle list from traci.
-        for vid in self.traci.simulation.getDepartedIDList():
-            if vid not in self.vehicles:
-                self.vehicles[vid] = self.generate_vehicle(vid)
-
-        for vid in self.traci.simulation.getArrivedIDList():
+        dead_vehicles = self.vehicles.keys() & set(self.traci.simulation.getArrivedIDList())
+        for vid in dead_vehicles:
             del self.vehicles[vid]
+
+        born_vehicles = set(self.traci.simulation.getDepartedIDList()) - self.vehicles.keys()
+        for vid in born_vehicles:
+            self.vehicles[vid] = self.generate_vehicle(vid)
+
+        if preheat: return 
 
         # Give vehicles chance to thange their EIDs and let match simulator know.
         if any([v.possibly_change_eid() for v in self.vehicles.values()]):
