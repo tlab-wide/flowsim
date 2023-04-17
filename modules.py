@@ -237,22 +237,25 @@ class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
 
-        self.pubkey_to_provers: Dict[Pubkey, set] = {}
-        self._unconfirmed_objects: Dict[int, Position] = {}
+        self.unmatched_pubkeys: Dict[Pubkey, EID] = {}
+        self.matched_pubkeys: Set[Pubkey] = set()
 
     def do_work(self, input: CPM) -> CPM:
         assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
 
         objid_to_pubkey = self.update_provers(input)
-        self.stage_objects(input, objid_to_pubkey)
-        return self.generate_cpm(input, objid_to_pubkey)
+
+        return CPM(input.sender, [
+            (oid, pos) for oid, pos in input.perceived_objects
+            if objid_to_pubkey.get(oid, None) in self.matched_pubkeys
+        ])
 
     def update_provers(self, input: CPM) -> None:
         # Generate pubkey from proofs and store them.
         # TODO: limit the number of unmatched proofs per sender.
-        objid_to_pubkey: Dict[int, Pubkey] = {}
-        for objid, p in input.proofs:
-            pubkey = pot_pubkey(p, input.sender)
+        objid_to_pubkey: Dict[ObjectID, Pubkey] = {}
+        for objid, proof in input.proofs:
+            pubkey = pot_pubkey(proof, input.sender)
 
             if pubkey == None:
                 # It is not a valid proof.
@@ -260,42 +263,20 @@ class PoTVerifier(VehicleModule):
 
             objid_to_pubkey[objid] = pubkey
 
-            if pubkey not in self.pubkey_to_provers:
-                self.pubkey_to_provers[pubkey] = set()
-            
-            self.pubkey_to_provers[pubkey].add(input.sender)
+            if pubkey in self.matched_pubkeys:
+                # Already matched.
+                continue
+
+            other = self.unmatched_pubkeys.get(pubkey, None)
+            if other and other != input.sender:
+                # Matched!
+                self.matched_pubkeys.add(pubkey)
+                del self.unmatched_pubkeys[pubkey]
+            else:
+                # Not matched yet.
+                self.unmatched_pubkeys[pubkey] = input.sender
+                
         return objid_to_pubkey
-
-    def stage_objects(self, input: CPM, objid_to_pubkey: Dict[int, Pubkey]) -> None:
-        # Stage objects.
-        for oid, pos in input.perceived_objects:
-            # Only stage objects with valid proof.
-            if oid in objid_to_pubkey:
-                self._unconfirmed_objects[oid] = pos
-
-    def generate_cpm(self, input: CPM, objid_to_pubkey: Dict[int, Pubkey]) -> CPM:
-        # Filter confirmed and unconfirmed objects.
-        confirmed = []
-        unconfirmed = []
-
-        for oid, pos in self._unconfirmed_objects.items():
-            # The Object didn't come with a proof, ignore.
-            if oid not in objid_to_pubkey:
-                #print("[%s] Warning: dropped object without proof, sender: %s" % (self.vehicle.numberplate, input.sender))
-                unconfirmed.append((oid, pos))
-                continue
-
-            provers = self.pubkey_to_provers.get(objid_to_pubkey[oid], set())
-
-            if len(provers) < 2:
-                unconfirmed.append((oid, pos))
-                continue
-
-            confirmed.append((oid, pos))
-
-        self._unconfirmed_objects = dict(unconfirmed)
-
-        return CPM(input.sender, confirmed)
 
 # =============================================================================
 #                              Attacker modules

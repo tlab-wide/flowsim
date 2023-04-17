@@ -4,10 +4,10 @@ import atexit
 import math
 import time
 
-import traci
 from vehicle import *
 from modules import *
 from utils import *
+import traci
 
 class Scenario(object):
     # The top-level simulation scenario.
