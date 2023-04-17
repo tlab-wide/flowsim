@@ -102,17 +102,16 @@ class Vehicle(object):
             output = module.do_work(input)
 
             # Break dfs if the current module produces no output.
-            if output == None: return
+            if not output: return
 
             # Handle list of output as well.
             if type(output) != list: output = [output]
 
-            for o in output:
-                assert isinstance(o, CPM), \
-                    f"Module {module_class.__name__} should return a CPM instead of {type(result)}."
+            assert all(isinstance(o, CPM) for o in output), \
+                f"Module {module_class.__name__} should return a CPM or a list of CPMs."
 
-                for target in self._data_flow_map[module_class]:
-                    _dfs(target, o)
+            for target in self._data_flow_map[module_class]:
+                _dfs(target, output)
 
         # DFS into the module flow tree.
         [_dfs(i, None) for i in self._source_modules]

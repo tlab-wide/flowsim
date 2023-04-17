@@ -28,6 +28,8 @@ class LocalPerception(VehicleModule):
 
         new_objects = self.vehicle.scenario.perception.perceive(self.vehicle)
 
+        if not new_objects: return None
+
         self.vehicle.local_objects.update([i[0] for i in new_objects])
         
         if len(new_objects) > 128:
@@ -45,11 +47,10 @@ class Planner(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
         self.recent_seen_objects = RingBuffer(10, lambda: set())
+    def do_work(self, input: List[CPM]) -> None:
+        assert isinstance(input, list), f"Module {self.__class__.__name__} requires list of CPM input."
 
-    def do_work(self, input: CPM) -> None:
-        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
-
-        objids = [i[0] for i in input.perceived_objects]
+        objids = sum([[i[0] for i in cpm.perceived_objects] for cpm in input], [])
         self.recent_seen_objects.current.update(objids)
         self.vehicle.all_objects.update(objids)
 
@@ -68,8 +69,8 @@ class CPSReceiver(VehicleModule):
 
         cpms = self.vehicle.scenario.network.receive(self.vehicle)
 
-        for cpm in cpms:
-            self.vehicle.received_objects.update([i[0] for i in cpm.perceived_objects])
+        objids = sum([[i[0] for i in cpm.perceived_objects] for cpm in cpms], [])
+        self.vehicle.received_objects.update(objids)
 
         return cpms
 
@@ -79,14 +80,15 @@ class CPSSender(VehicleModule):
 
         self.cpms_to_send: List[CPM] = []
 
-    def do_work(self, input: CPM) -> None:
-        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
+    def do_work(self, input: List[CPM]) -> None:
+        assert isinstance(input, list), f"Module {self.__class__.__name__} requires list of CPM input."
 
         # Canonicalize the CPM.
-        input.sender = self.vehicle.eid
-        input._objid_to_numberplate = {}
+        for cpm in input:
+            cpm.sender = self.vehicle.eid
+            cpm._objid_to_numberplate = {}
 
-        self.cpms_to_send.append(input)
+        self.cpms_to_send += input
 
         return None
 
@@ -207,26 +209,28 @@ class PoTProver(VehicleModule):
             # Only keep unmatched EIDs.
             self.recent_unmatched_eids.current.add(e)
 
-    def do_work(self, input: CPM) -> CPM:
-        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
+    def do_work(self, input: List[CPM]) -> List[CPM]:
+        assert isinstance(input, list), f"Module {self.__class__.__name__} requires list of CPM input."
 
         # Notice that modules runs after change_eid(),
         # so the ego's EID is consistent among modules,
         # and can be used for determine source of CPM.
-        if input.sender != self.vehicle.eid:
-            # Received a CPM from another vehicle.
-            # We only need to collect its EID.
-            return self.hear(input.sender)
+        if input[0].sender != self.vehicle.eid:
+            # Received a list of CPMs from another vehicle.
+            # We only need to collect their EIDs.
+            [self.hear(cpm.sender) for cpm in input]
+            return None
 
         # Received a CPM from LocalPerception.
+        assert len(input) == 1, f"Module {self.__class__.__name__} requires only one CPM input from LocalPerception."
 
         # Record numberplates from perceived objects.
-        self.known_numberplates |= set(input._objid_to_numberplate.values())
+        self.known_numberplates |= set(input[0]._objid_to_numberplate.values())
 
         # Match!
         self.update_matches()
 
-        return self.generate_proofs(input)
+        return self.generate_proofs(input[0])
 
     def flush(self) -> None:
         # Advance the recent_sent_proofs and recent_unmatched_eids.
@@ -240,41 +244,48 @@ class PoTVerifier(VehicleModule):
         self.unmatched_pubkeys: Dict[Pubkey, EID] = {}
         self.matched_pubkeys: Set[Pubkey] = set()
 
-    def do_work(self, input: CPM) -> CPM:
-        assert isinstance(input, CPM), f"Module {self.__class__.__name__} requires CPM input."
+    def do_work(self, input: List[CPM]) -> List[CPM]:
+        assert isinstance(input, list), f"Module {self.__class__.__name__} requires list of CPM input."
 
         objid_to_pubkey = self.update_provers(input)
 
-        return CPM(input.sender, [
-            (oid, pos) for oid, pos in input.perceived_objects
-            if objid_to_pubkey.get(oid, None) in self.matched_pubkeys
-        ])
+        ret = []
+        for cpm in input:
+            ret.append(CPM(cpm.sender, [
+                (oid, pos) for oid, pos in cpm.perceived_objects
+                if objid_to_pubkey.get(oid, None) in self.matched_pubkeys
+            ]))
 
-    def update_provers(self, input: CPM) -> None:
+        return ret
+
+    def update_provers(self, input: List[CPM]) -> None:
         # Generate pubkey from proofs and store them.
         # TODO: limit the number of unmatched proofs per sender.
         objid_to_pubkey: Dict[ObjectID, Pubkey] = {}
-        for objid, proof in input.proofs:
-            pubkey = pot_pubkey(proof, input.sender)
 
-            if pubkey == None:
-                # It is not a valid proof.
-                continue
+        # TODO: naive loop implementation. Need rethink.
+        for cpm in input:
+            for objid, proof in cpm.proofs:
+                pubkey = pot_pubkey(proof, cpm.sender)
 
-            objid_to_pubkey[objid] = pubkey
+                if pubkey == None:
+                    # It is not a valid proof.
+                    continue
 
-            if pubkey in self.matched_pubkeys:
-                # Already matched.
-                continue
+                objid_to_pubkey[objid] = pubkey
 
-            other = self.unmatched_pubkeys.get(pubkey, None)
-            if other and other != input.sender:
-                # Matched!
-                self.matched_pubkeys.add(pubkey)
-                del self.unmatched_pubkeys[pubkey]
-            else:
-                # Not matched yet.
-                self.unmatched_pubkeys[pubkey] = input.sender
+                if pubkey in self.matched_pubkeys:
+                    # Already matched.
+                    continue
+
+                other = self.unmatched_pubkeys.get(pubkey, None)
+                if other and other != cpm.sender:
+                    # Matched!
+                    self.matched_pubkeys.add(pubkey)
+                    del self.unmatched_pubkeys[pubkey]
+                else:
+                    # Not matched yet.
+                    self.unmatched_pubkeys[pubkey] = cpm.sender
                 
         return objid_to_pubkey
 
