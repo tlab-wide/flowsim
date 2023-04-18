@@ -121,10 +121,12 @@ class Scenario(object):
         dead_vehicles = self.vehicles.keys() & set(self.traci.simulation.getArrivedIDList())
         for vid in dead_vehicles:
             del self.vehicles[vid]
+            self.traci.vehicle.unsubscribe(vid)
 
         born_vehicles = set(self.traci.simulation.getDepartedIDList()) - self.vehicles.keys()
         for vid in born_vehicles:
             self.vehicles[vid] = self.generate_vehicle(vid)
+            self.traci.vehicle.subscribe(vid, [traci.constants.VAR_POSITION, traci.constants.VAR_ANGLE])
 
         if preheat: return 
 
@@ -208,8 +210,6 @@ class PositionManagerV2(object):
         self.config = scenario.config['position_manager']
         self.range_limit = self.config['range_limit']
 
-        self.subscribed = set()
-
         grid_size = self.range_limit
 
         self.boundary = self.traci.simulation.getNetBoundary()
@@ -263,12 +263,6 @@ class PositionManagerV2(object):
         # Set vehicles' positions to the data at the given tick.
         self._position = {}
 
-        for numberplate, v in self.vehicles.items():
-            # Subscribe to the vehicle if not already subscribed.
-            if numberplate not in self.subscribed:
-                self.traci.vehicle.subscribe(numberplate, [traci.constants.VAR_POSITION, traci.constants.VAR_ANGLE])
-                self.subscribed.add(numberplate)
-
         result = self.traci.vehicle.getAllSubscriptionResults()
 
         for numberplate, v in self.vehicles.items():
@@ -279,8 +273,6 @@ class PositionManagerV2(object):
             # Need to convert it to theta (0 for East, 90 for North, etc.)
             theta = (360 + 90 - yaw) % 360
             self._position[v] = Position(x, y, theta)
-
-        # TODO: Do we need to unsubscribe vehicles that are no longer in the simulation?
 
         self._update_grid()
         self._update_nearby()
