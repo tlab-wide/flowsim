@@ -120,8 +120,9 @@ class Scenario(object):
         # Update vehicle list from traci.
         dead_vehicles = self.vehicles.keys() & set(self.traci.simulation.getArrivedIDList())
         for vid in dead_vehicles:
+            # The dead vehicles will be automatically unsubscribed.
+            #self.traci.vehicle.unsubscribe(vid)
             del self.vehicles[vid]
-            self.traci.vehicle.unsubscribe(vid)
 
         born_vehicles = set(self.traci.simulation.getDepartedIDList()) - self.vehicles.keys()
         for vid in born_vehicles:
@@ -265,9 +266,9 @@ class PositionManagerV2(object):
 
         result = self.traci.vehicle.getAllSubscriptionResults()
 
-        for numberplate, v in self.vehicles.items():
-            x, y = result[numberplate][traci.constants.VAR_POSITION]
-            yaw  = result[numberplate][traci.constants.VAR_ANGLE]
+        for vid, v in self.vehicles.items():
+            x, y = result[vid][traci.constants.VAR_POSITION]
+            yaw  = result[vid][traci.constants.VAR_ANGLE]
 
             # Warning: getAngle returns yaw (0 for North, 90 for East, etc.)
             # Need to convert it to theta (0 for East, 90 for North, etc.)
