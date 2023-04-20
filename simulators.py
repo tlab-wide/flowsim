@@ -122,6 +122,7 @@ class Scenario(object):
         for vid in dead_vehicles:
             # The dead vehicles will be automatically unsubscribed.
             #self.traci.vehicle.unsubscribe(vid)
+            self.vehicles[vid].cleanup()
             del self.vehicles[vid]
 
         born_vehicles = set(self.traci.simulation.getDepartedIDList()) - self.vehicles.keys()

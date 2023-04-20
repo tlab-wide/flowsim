@@ -120,6 +120,17 @@ class Vehicle(object):
         # Flush all modules.
         [i.flush() for i in self._module_instance_map.values()]
 
+    def cleanup(self):
+        # Cleanup: remove all objects to mitigate the memory leak.
+        self.local_objects.clear()
+        del self.local_objects
+        self.all_objects.clear()
+        del self.all_objects
+        self.received_objects.clear()
+        del self.received_objects
+        self._module_instance_map.clear()
+        del self._module_instance_map
+
 # =========================================
 #   Definition of different vehicle types
 # =========================================
