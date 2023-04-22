@@ -14,9 +14,9 @@ output_dir: 'output/lust-pot-1400-1500'
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
   ConnectedVehicle: 0.
-  PoTVehicle: 0.99
+  PoTVehicle: 1.
   SilenceAttacker: 0.
-  SpamAttacker: 0.01
+  SpamAttacker: 0.
   ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.

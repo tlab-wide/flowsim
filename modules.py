@@ -168,7 +168,7 @@ class PoTProver(VehicleModule):
                     # Drop the oldest proof if queue is full.
                     droped_objid = self.queued_proofs.pop(0)[0]
                     self.vehicle.n_dropped_proofs += 1
-                    print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate, file=sys.stderr)
+                    #print("[%s] Warning: drop oldest queued proof" % self.vehicle.numberplate, file=sys.stderr)
 
                 self.queued_proofs.append(proof_entry)
                 self.vehicle.n_enqueued_proofs += 1

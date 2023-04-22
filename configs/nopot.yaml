@@ -13,10 +13,10 @@ output_dir: 'output/lust-nopot'
 
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
-  ConnectedVehicle: 0.99
+  ConnectedVehicle: 1.
   PoTVehicle: 0.
   SilenceAttacker: 0.
-  SpamAttacker: 0.01
+  SpamAttacker: 0.
   ReplayAttacker: 0.
   #SignalJammingAttacker: 0.
   SybilAttacker: 0.

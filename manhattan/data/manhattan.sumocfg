@@ -30,7 +30,7 @@
     <time>
         <begin value="0"/>
         <step-length value="1"/>
-        <end value="86400"/>
+        <end value="25200"/>
     </time>
 
     <report>
