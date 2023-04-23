@@ -133,8 +133,7 @@ class Scenario(object):
         if preheat: return 
 
         # Give vehicles chance to thange their EIDs and let match simulator know.
-        if any([v.possibly_change_eid() for v in self.vehicles.values()]):
-            self.match.update_eids()
+        self.match.update_eids()
 
         t1 = time.time()
         # Let position manager to update vehicles' position.
