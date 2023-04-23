@@ -171,13 +171,11 @@ class Scenario(object):
     # Metric collectors.
     def collect_vehicle_sent_bytes(self) -> VehicleMetric:
         # Collect how many bytes a vehicle sent in this tick.
-        ret = dict((id, 0) for id in self.vehicles.keys())
+        ret = {}
 
         for v, b in self.network.bytes_sent.items():
+            ret.setdefault(v.numberplate, 0)
             ret[v.numberplate] += b
-
-        #for v in self.vehicles.values():
-        #    ret[v.numberplate] += self.network.bytes_sent[v]
 
         # XXX: reset bytes_sent here.
         self.network.bytes_sent = {}

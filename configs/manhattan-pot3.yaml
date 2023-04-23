@@ -8,7 +8,7 @@ seed: 42
 
 use_gui: false
 
-output_dir: 'output/manhattan-nopot'
+output_dir: 'output/manhattan-pot3'
 
 vehicle_type_probabilities:
   UnconnectedVehicle: 0.
