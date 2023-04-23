@@ -1,0 +1,44 @@
+
+
+--- 
+
+sumo_config_path: "manhattan/data/manhattan.sumocfg"
+
+seed: 42
+
+use_gui: false
+
+output_dir: 'output/manhattan-pot'
+
+vehicle_type_probabilities:
+  UnconnectedVehicle: 0.
+  ConnectedVehicle: 0.
+  PoTVehicle: 1.
+  SilenceAttacker: 0.
+  SpamAttacker: 0.
+  ReplayAttacker: 0.
+  #SignalJammingAttacker: 0.
+  SybilAttacker: 0.
+
+
+position_manager:
+  range_limit: 200 # meters
+
+network_simulator:
+  v2v_pdr: 0.95
+
+perception_simulator:
+  vision_distance: 40 # meters
+  fov: 45 # degrees (of one side)
+  target_max_rotation: 60 # degrees (of one side)
+
+vehicle:
+  width: 1.84
+  length: 4.88
+  numberplate_width: 0.35
+  eid_changing_possibility: 0.
+  pot_verifier_max_unverified_per_vehicle: 20
+
+  PoTProver:
+    #send_proof_every: 3 # ticks
+    max_queued_proofs: 24
