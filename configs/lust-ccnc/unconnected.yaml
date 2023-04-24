@@ -1,0 +1,41 @@
+
+
+--- 
+
+#sumo_config_path: "manhattan/data/manhattan.sumocfg"
+sumo_config_path: "configs/lust.sumocfg"
+
+seed: 42
+
+use_gui: false
+
+output_dir: 'output/lust-ccnc-unconnected'
+
+vehicle_type_probabilities:
+  UnconnectedVehicle: 1.
+  ConnectedVehicle: 0.
+  PoTVehicle: 0.
+  SilenceAttacker: 0.
+  SpamAttacker: 0.
+  ReplayAttacker: 0.
+  #SignalJammingAttacker: 0.
+  SybilAttacker: 0.
+
+
+position_manager:
+  range_limit: 300 # meters
+
+network_simulator:
+  v2v_pdr: 0.8
+
+perception_simulator:
+  vision_distance: 65 # meters
+  fov: 60 # degrees (of one side)
+  target_max_rotation: 60 # degrees (of one side)
+
+vehicle:
+  width: 1.8
+  length: 4
+  numberplate_width: 0.35
+  eid_changing_possibility: 0.000023148148148 # 1 / 43200
+  pot_verifier_max_unverified_per_vehicle: 20
