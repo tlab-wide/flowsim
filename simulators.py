@@ -51,6 +51,8 @@ class Scenario(object):
             'all_objects':      MetricCollector(format_dir('all_objects.json'     ), collect_per_vehicle(lambda v: len(v.all_objects     ))),
             'local_objects':    MetricCollector(format_dir('local_objects.json'   ), collect_per_vehicle(lambda v: len(v.local_objects   ))),
             'received_objects': MetricCollector(format_dir('received_objects.json'), collect_per_vehicle(lambda v: len(v.received_objects))),
+
+            'time_to_verify_histogram': MetricCollector(format_dir('ttv_histogram.json'), collect_per_vehicle(lambda v: v.time_to_verify_buckets)),
         }
 
         atexit.register(self.cleanup)

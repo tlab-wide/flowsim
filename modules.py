@@ -237,7 +237,18 @@ class PoTVerifier(VehicleModule):
     def __init__(self, vehicle: 'Vehicle'):
         super().__init__(vehicle)
 
-        self.unmatched_pubkeys: Dict[Pubkey, EID] = {}
+        # Initialize config.
+        self.config = self.vehicle.config.get('PoTVerifier', {})
+        self.nbuckets = self.config.get('time_to_verify_buckets', 601)
+
+        self.vehicle = vehicle
+        self.vehicle.time_to_verify_buckets = [0] * self.nbuckets
+
+        # Prepare n - 1 unmatched pubkeys slots for time to verify calculation.
+        self.unmatched_pubkeys: RingBuffer[Dict[Pubkey, EID]] = RingBuffer(self.nbuckets - 1, lambda: {})
+        # Additionally, put all stale pubkeys in the last slot.
+        self.unmatched_pubkeys_stale: Dict[Pubkey, EID] = {}
+
         self.matched_pubkeys: Set[Pubkey] = set()
 
     def do_work(self, input: CPM) -> CPM:
@@ -249,6 +260,20 @@ class PoTVerifier(VehicleModule):
             (oid, pos) for oid, pos in input.perceived_objects
             if objid_to_pubkey.get(oid, None) in self.matched_pubkeys
         ])
+
+    def find_and_pop_if_match(self, pubkey: Pubkey, other_eid: EID, slot: Dict[Pubkey, EID]) -> Optional[EID]:
+        # Find the EID to the given pubkey in the given slot, and remove it if it does NOT match the given other EID.
+
+        if pubkey not in slot:
+            # Not found.
+            return None
+
+        if slot[pubkey] == other_eid:
+            # It is the same EID.
+            return None
+
+        # It is a different EID.
+        return slot.pop(pubkey)
 
     def update_provers(self, input: CPM) -> None:
         # Generate pubkey from proofs and store them.
@@ -267,16 +292,32 @@ class PoTVerifier(VehicleModule):
                 # Already matched.
                 continue
 
-            other = self.unmatched_pubkeys.get(pubkey, None)
-            if other and other != input.sender:
-                # Matched!
+
+            # Try match it first against the stale slot.
+            if self.find_and_pop_if_match(pubkey, input.sender, self.unmatched_pubkeys_stale):
                 self.matched_pubkeys.add(pubkey)
-                del self.unmatched_pubkeys[pubkey]
+                self.vehicle.time_to_verify_buckets[self.nbuckets - 1] += 1
+                continue
+
+            # If not, try match it against the recent slots.
+            for n, slot in enumerate(self.unmatched_pubkeys.data):
+                if self.find_and_pop_if_match(pubkey, input.sender, slot):
+                    self.matched_pubkeys.add(pubkey)
+                    self.vehicle.time_to_verify_buckets[n] += 1
+                    break
             else:
-                # Not matched yet.
-                self.unmatched_pubkeys[pubkey] = input.sender
-                
+                # If it is still not matched, put it in the first slot.
+                self.unmatched_pubkeys.current[pubkey] = input.sender
+
         return objid_to_pubkey
+
+    def flush(self) -> None:
+        # Put all unmatched pubkeys in the last slot into the stale slot.
+        for pubkey, sender in self.unmatched_pubkeys.data[-1].items():
+            self.unmatched_pubkeys_stale[pubkey] = sender
+
+        # Then, advance the unmatched_pubkeys.
+        self.unmatched_pubkeys.advance()
 
 # =============================================================================
 #                              Attacker modules

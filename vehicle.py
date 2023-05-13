@@ -43,6 +43,17 @@ class Vehicle(object):
     def __post_init__(self):
         # dataclass exposes this method which meant to be run after __init__.
 
+        # Setup metrics first, to make them available in modules' __init__.
+        self.local_objects: Set[ObjectID] = set()
+        self.all_objects: Set[ObjectID] = set()
+        self.received_objects: Set[ObjectID] = set()
+
+        self.n_sent_proofs: int = 0
+        self.n_enqueued_proofs: int = 0
+        self.n_dropped_proofs: int = 0
+
+        self.time_to_verify_buckets: List[int] = [] # This will be initialized by PoTVerifier if it is enabled.
+
         # Generate initial EID.
         self.change_eid()
 
@@ -60,15 +71,6 @@ class Vehicle(object):
         # Operates in the original list to maintain the right order of source modules.
         flow_targets = set(sum(self._data_flow_map.values(), []))
         self._source_modules = [i[0] for i in data_flow if i[0] not in flow_targets]
-
-        # Metrics.
-        self.local_objects: Set[ObjectID] = set()
-        self.all_objects: Set[ObjectID] = set()
-        self.received_objects: Set[ObjectID] = set()
-
-        self.n_sent_proofs: int = 0
-        self.n_enqueued_proofs: int = 0
-        self.n_dropped_proofs: int = 0
 
     def __eq__(lhs, rhs):
         return lhs.__class__ == rhs.__class__ and lhs.numberplate == rhs.numberplate

@@ -37,8 +37,11 @@ vehicle:
   length: 4.88
   numberplate_width: 0.35
   eid_changing_possibility: 0.000023148148148 # 1 / 43200
-  pot_verifier_max_unverified_per_vehicle: 20
 
   PoTProver:
     send_proof_every: 3 # ticks
     max_queued_proofs: 24
+
+  PoTVerifier:
+    max_unverified_per_vehicle: 20 # TODO
+    time_to_verify_buckets: 31 # 30 seconds + the stale one
