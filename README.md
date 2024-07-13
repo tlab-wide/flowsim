@@ -17,7 +17,7 @@ The key features of Flowsim are:
 * <strong>Reproducible</strong>: Flowsim ensures reproducibility of experiments by providing a well-documented and accessible codebase, fostering collaboration and knowledge sharing within the research community.
 
 ## Major Components
-![Flowsim structure][docs/images/overview.pdf]
+![Flowsim structure](docs/images/overview.svg)
 
 Flowsim consists of three major components: <strong>Environment</strong>,  <strong>Sandbox</strong>, and <strong>Vehicle</strong>s.
 
@@ -52,7 +52,7 @@ TBD
 
 ### Developer Guide
 
-![Defining vehicle types][docs/images/vehicle_types.pdf]
+![Defining vehicle types](docs/images/vehicle_types.svg)
 
 
 ### Contribution Guidelines
